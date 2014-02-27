@@ -1,34 +1,35 @@
 grammar
   <- __ initializer:initializer? rules:rule+
   %{
-    [_, Initializer, Rules] = Node,
-    [
+    Initializer = get_value('initializer', Node),
+    Rules = get_value('rules', Node),
+    #ast{data = [
       {type,        "grammar"},
       {initializer, Initializer},
       {rules,       Rules}
-    ]
+    ]}
   %};
 
 initializer
   <- code:action semicolon?
   %{
-    [Code, _] = Node,
-    [
+    Code = get_value('code', Node),
+    #ast{data = [
       {type, "initializer"},
       {code, Code}
-    ]
+    ]}
   %};
 
 rule
   <- name:identifier displayName:string? equals expression:expression semicolon?
   %{
-    {_, Expression} = lists:keyfind(expression, 1, Node),
-    {_, Name}       = lists:keyfind(name, 1, Node),
-    case lists:keyfind(displayName, 1, Node) of
-      {_, []} ->
+    Expression = get_value(expression, Node),
+    Name       = get_value(name, Node),
+    case get_value(displayName, Node) of
+      [] ->
         Expression;
-      {_, DisplayName} ->
-        [
+      DisplayName ->
+        #ast{data = [
           {type,        "rule"},
           {name,        Name},
           {expression,  [
@@ -37,7 +38,7 @@ rule
                           {expression, Expression}
                         ]
           }
-        ]
+        ]}
      end
   %};
 
@@ -45,141 +46,186 @@ expression
   <- choice;
 
 choice
-  <- head:sequence tail:(slash sequence)*;
-%  {
-%      if (tail.length > 0) {
-%        var alternatives = [head].concat(utils.map(
-%            tail,
-%            function(element) { return element[1]; }
-%        ));
-%        return {
-%          type:         "choice",
-%          alternatives: alternatives
-%        };
-%      } else {
-%        return head;
-%      }
-%    }
+  <- head:sequence tail:(slash sequence)*
+  %{
+    Head = get_value(head, Node),
+    Tail = get_value(tail, Node),
+    case Tail of
+      [] ->
+        Head;
+      _List ->
+        Alternatives0 = lists:foldl(
+                          fun(E, Acc) ->
+                            [_, Sequence] = E,
+                            [Sequence | Acc]
+                          end,
+                          [Head],
+                          Tail
+                        ),
+        Alternatives = lists:reverse(Alternatives0),
+        #ast{data = [
+          {type, "choice"},
+          {alternatives, Alternatives}
+        ]}
+    end
+  %};
 
 sequence
   <- elements:labeled* code:action
-%   {
-%      var expression = elements.length !== 1
-%        ? {
-%            type:     "sequence",
-%            elements: elements
-%          }
-%        : elements[0];
-%      return {
-%        type:       "action",
-%        expression: expression,
-%        code:       code
-%      };
-%    }
-  / elements:labeled*;
-%   {
-%      return elements.length !== 1
-%        ? {
-%            type:     "sequence",
-%            elements: elements
-%          }
-%        : elements[0];
-%    }
+  / elements:labeled*
+  %{
+    Node0 = case Node of
+              N when is_list(N) -> N;
+              _ -> [Node]
+            end,
+    Elements = get_value('elements', Node0),
+    Code     = get_value('code', Node0),
+    Expression = case Elements of
+                   [OneElement] -> OneElement;
+                   _ -> #ast{data = [
+                                      {type, "sequence"},
+                                      {elements, Elements}
+                                    ]}
+                 end,
+    case Code of
+      [] ->
+        Expression;
+      _     ->
+        #ast{data = [
+          {type, "action"},
+          {expression, Expression},
+          {code, Code}
+        ]}
+    end
+  %};
 
 labeled
   <- label:identifier colon expression:prefixed
-%   {
-%      return {
-%        type:       "labeled",
-%        label:      label,
-%        expression: expression
-%      };
-%    }
   / prefixed;
 
 prefixed
-  <- dollar expression:suffixed
-%  {
-%      return {
-%        type:       "text",
-%        expression: expression
-%      };
-%    }
-  / and code:action
-%  {
-%      return {
-%        type: "semantic_and",
-%        code: code
-%      };
-%    }
-  / and expression:suffixed
-%  {
-%      return {
-%        type:       "simple_and",
-%        expression: expression
-%      };
-%    }
-  / not code:action
-%  {
-%      return {
-%        type: "semantic_not",
-%        code: code
-%      };
-%    }
-  / not expression:suffixed
-%  {
-%      return {
-%        type:       "simple_not",
-%        expression: expression
-%      };
-%    }
-  / suffixed;
+  <- dollar:dollar expression:suffixed
+  / and:and code:action
+  / and:and expression:suffixed
+  / not:not code:action
+  / not:not expression:suffixed
+  / suffixed
+  %{
+    And        = get_value('and', Node),
+    Code       = get_value('code', Node),
+    Dollar     = get_value('dollar', Node),
+    Expression = get_value('expression', Node),
+    Not        = get_value('not', Node),
+
+    case Dollar of
+      [] ->
+        case And of
+          [] ->
+            case Not of
+              [] -> Node; %% suffixed
+              _  ->
+                case Code of
+                  [] -> % not:not expression:suffixed
+                    #ast{data = [
+                      {type, "simple_not"},
+                      {expression, Expression}
+                    ]};
+                  _  -> % not:not code:action
+                    #ast{data = [
+                      {type, "semantic_not"},
+                      {code, Code}
+                    ]}
+                end
+            end;
+          _  ->
+            case Code of
+              [] -> % and:and expression:suffixed
+                #ast{data = [
+                  {type, "simple_and"},
+                  {expression, Expression}
+                ]};
+              _  -> % and:and code:action
+                #ast{data = [
+                  {type, "semantic_and"},
+                  {code, Code}
+                ]}
+            end
+        end;
+      _ ->  % ollar:dollar expression:suffixed
+        #ast{data = [
+          {type, "text"},
+          {expression, Expression}
+        ]}
+    end
+  %};
 
 suffixed
-  <- expression:primary question
-%  {
-%      return {
-%        type:       "optional",
-%        expression: expression
-%      };
-%    }
-  / expression:primary star
-%  {
-%      return {
-%        type:       "zero_or_more",
-%        expression: expression
-%      };
-%    }
-  / expression:primary plus
-%  {
-%      return {
-%        type:       "one_or_more",
-%        expression: expression
-%      };
-%    }
-  / primary;
+  <- expression:primary suffix:question
+  / expression:primary suffix:star
+  / expression:primary suffix:plus
+  / primary
+  %{
+    Expression = get_value('expression', Node),
+    Suffix     = get_value('suffix', Node),
+    case Expression of
+      [] -> Node;
+      _  ->
+        case Suffix of
+          <<"?">> ->
+            #ast{data = [
+              {type, "optional"},
+              {expression, Expression}
+            ]};
+          <<"*">> ->
+            #ast{data = [
+              {type, "zero_or_more"},
+              {expression, Expression}
+            ]};
+          <<"+">> ->
+            #ast{data = [
+              {type, "one_or_more"},
+              {expression, Expression}
+            ]}
+        end
+    end
+  %};
 
 primary
   <- name:identifier !(string? equals)
-%  {
-%      return {
-%        type: "rule_ref",
-%        name: name
-%      };
-%    }
   / literal
   / class
-  / dot % { return { type: "any" }; }
-  / lparen expression:expression rparen; % { return expression; }
+  / dot
+  / lparen expression:expression rparen
+  %{
+    case Node of
+      <<".">> -> [{type, "any"}];
+      [_, _] ->
+        #ast{data = [
+          {type, "rule_ref"},
+          {name, get_value('name', Node)}
+        ]};
+      [_, _, _] ->
+        get_value('expression', Node);
+      _ ->
+        Node
+    end
+  %};
 
 %/* "Lexical" elements */
 
 action
-  <- braced:braced __; % { return braced.substr(1, braced.length - 2); }
+  <- braced:braced __
+  %{
+    Braced = get_value(braced, Node),
+    binary:part(Braced, 1, size(Braced) - 2)
+  %};
 
 braced
-  <- %"$"
-  ("{" (braced / nonBraceCharacters)* "}");
+  <-
+  ("{" (braced / nonBraceCharacters)* "}")
+  %{
+    stringify(Node)
+  %};
 
 nonBraceCharacters
   <- nonBraceCharacter+;
@@ -187,19 +233,19 @@ nonBraceCharacters
 nonBraceCharacter
   <- [^{}];
 
-equals    <- "=" __; % { return "="; }
-colon     <- ":" __; % { return ":"; }
-semicolon <- ";" __; % { return ";"; }
-slash     <- "/" __; % { return "/"; }
-and       <- "&" __; % { return "&"; }
-not       <- "!" __; % { return "!"; }
-dollar    <- "$" __; % { return "$"; }
-question  <- "?" __; % { return "?"; }
-star      <- "*" __; % { return "*"; }
-plus      <- "+" __; % { return "+"; }
-lparen    <- "(" __; % { return "("; }
-rparen    <- ")" __; % { return ")"; }
-dot       <- "." __; % { return "."; }
+equals    <- "=" __ %{ <<"=">> %};
+colon     <- ":" __ %{ <<":">> %};
+semicolon <- ";" __ %{ <<";">> %};
+slash     <- "/" __ %{ <<"/">> %};
+and       <- "&" __ %{ <<"&">> %};
+not       <- "!" __ %{ <<"!">> %};
+dollar    <- "$" __ %{ <<"$">> %};
+question  <- "?" __ %{ <<"?">> %};
+star      <- "*" __ %{ <<"*">> %};
+plus      <- "+" __ %{ <<"+">> %};
+lparen    <- "(" __ %{ <<"(">> %};
+rparen    <- ")" __ %{ <<")">> %};
+dot       <- "." __ %{ <<".">> %};
 
 %/*
 % * Modeled after ECMA-262, 5th ed., 7.6, but much simplified:
@@ -221,29 +267,36 @@ dot       <- "." __; % { return "."; }
 % */
 
 identifier
-  %% has to be $'fied
-  <- chars:((letter / "_") (letter / digit / "_")*) __; % { return chars; }
+  <- chars:((letter / "_") (letter / digit / "_")*) __
+  %{
+    stringify(get_value(chars, Node))
+  %};
 
 %/*
 % * Modeled after ECMA-262, 5th ed., 7.8.4. (syntax & semantics, rules only
 % * vaguely).
 % */
 literal
-  <- value:(doubleQuotedString / singleQuotedString) flags:"i"? __;
-%  {
-%      return {
-%        type:       "literal",
-%        value:      value,
-%        ignoreCase: flags === "i"
-%      };
-%    }
+  <- value:(doubleQuotedString / singleQuotedString) flags:"i"? __
+  %{
+  #ast{data= [
+    {type, "literal"},
+    {value, get_value('value', Node)},
+    {ignoreCase, get_value('flags', Node) == <<"i">>}
+  ]}
+  %};
 
 string
-  <- string:(doubleQuotedString / singleQuotedString) __ ;
-   % { return string; }
+  <- string:(doubleQuotedString / singleQuotedString) __
+  %{
+    get_value('string', Node)
+  %};
 
 doubleQuotedString
-  <- '"' chars:doubleQuotedCharacter* '"'; % { return chars.join(""); }
+  <- '"' chars:doubleQuotedCharacter* '"'
+  %{
+    stringify(get_value(chars, Node))
+  %};
 
 doubleQuotedCharacter
   <- simpleDoubleQuotedCharacter
@@ -254,10 +307,16 @@ doubleQuotedCharacter
   / eolEscapeSequence;
 
 simpleDoubleQuotedCharacter
-  <- !('"' / "\\" / eolChar) char_:.; % { return char_; }
+  <- !('"' / "\\" / eolChar) char_:.
+  %{
+    get_value('char_', Node)
+  %};
 
 singleQuotedString
-  <- "'" chars:singleQuotedCharacter* "'"; % { return chars.join(""); }
+  <- "'" chars:singleQuotedCharacter* "'"
+  %{
+    stringify(get_value(chars, Node))
+  %};
 
 singleQuotedCharacter
   <- simpleSingleQuotedCharacter
@@ -268,54 +327,62 @@ singleQuotedCharacter
   / eolEscapeSequence;
 
 simpleSingleQuotedCharacter
-  <- !("'" / "\\" / eolChar) char_:.; % { return char_; }
+  <- !("'" / "\\" / eolChar) char_:.
+  %{
+    get_value('char_', Node)
+  %}; % { return char_; }
 
 class
-  <- "[" inverted:"^"? parts:(classCharacterRange / classCharacter)* "]" flags:"i"? __;
-%  {
-%      var partsConverted = utils.map(parts, function(part) { return part.data; });
-%      var rawText = "["
-%        + (inverted !== null ? inverted : "")
-%        + utils.map(parts, function(part) { return part.rawText; }).join("")
-%        + "]"
-%        + (flags !== null ? flags : "");
-%
-%      return {
-%        type:       "class",
-%        parts:      partsConverted,
-%        // FIXME: Get the raw text from the input directly.
-%        rawText:    rawText,
-%        inverted:   inverted === "^",
-%        ignoreCase: flags === "i"
-%      };
-%    }
+  <- "[" inverted:"^"? parts:(classCharacterRange / classCharacter)* "]" flags:"i"? __
+  %{
+    Inverted = case get_value(inverted, Node) of [] -> <<>>; I -> I end,
+    Parts = get_value(parts, Node),
+    Flags = case get_value(flags, Node) of [] -> <<>>; F -> F end,
+
+    PartsConverted = lists:map(fun(Part) -> get_value(data, Part) end, Parts),
+    PartsRawText = << <<(get_attr(raw_text, Part))/binary>> || Part <- Parts>>,
+    RawText = << "["
+               , Inverted/binary
+               , PartsRawText/binary
+               , "]"
+               , Flags/binary
+              >>,
+    #ast{data = [
+      {type, "class"},
+      {parts, PartsConverted},
+      {raw_text, RawText},
+      {inverted, Inverted == <<"^">>},
+      {ignore_case, Flags == <<"i">>}
+    ]}
+  %};
 
 classCharacterRange
-  <- begin:classCharacter "-" end:classCharacter;
-%   {
-%      if (begin.data.charCodeAt(0) > end.data.charCodeAt(0)) {
-%        error(
-%          "Invalid character range: " + begin.rawText + "-" + end.rawText + "."
-%        );
-%      }
-%
-%      return {
-%        data:    [begin.data, end.data],
-%        // FIXME: Get the raw text from the input directly.
-%        rawText: begin.rawText + "-" + end.rawText
-%      };
-%    }
+  <- begin:classCharacter "-" end:classCharacter
+  %{
+    Begin = get_value('begin', Node),
+    End = get_value('end', Node),
+    RawBegin = get_attr(raw_text, Begin),
+    RawEnd = get_attr(raw_text, End),
+    case Begin > End of
+      true ->
+        error({invalid_character_range, {RawBegin, RawEnd}});
+      false ->
+        #ast{data = [
+          {data, [get_value(data, Begin), get_value(data, End)]},
+          {raw_text, <<RawBegin/binary, "-", RawEnd/binary>>}
+        ]}
+    end
+  %};
 
 classCharacter
-  <- %chars:
-  bracketDelimitedCharacter;
-%   {
-%      return {
-%        data:    char_,
-%        // FIXME: Get the raw text from the input directly.
-%        rawText: utils.quoteForRegexpClass(char_)
-%      };
-%    }
+  <- bracketDelimitedCharacter
+  %{
+    #ast{data = [
+                   {data, Node},
+                   {raw_text, quote_for_regexp_class(Node)}
+                 ]
+         }
+  %};
 
 bracketDelimitedCharacter
   <- simpleBracketDelimitedCharacter
@@ -326,43 +393,58 @@ bracketDelimitedCharacter
   / eolEscapeSequence;
 
 simpleBracketDelimitedCharacter
-  <- !("]" / "\\" / eolChar) char_:.;% { return char_; }
+  <- !("]" / "\\" / eolChar) char_:.
+  %{
+    {_, Char} = lists:keyfind('char_', 1, Node),
+    Char
+  %};
 
 simpleEscapeSequence
-  <- "\\" !(digit / "x" / "u" / eolChar) char_:.;
-%   {
-%      return char_
-%        .replace("b", "\b")
-%        .replace("f", "\f")
-%        .replace("n", "\n")
-%        .replace("r", "\r")
-%        .replace("t", "\t")
-%        .replace("v", "\x0B"); // IE does not recognize "\v".
-%    }
+  <- "\\" !(digit / "x" / "u" / eolChar) char_:.
+  %{
+    {_, Char} = lists:keyfind('char_', 1, Node),
+    case Char of
+      <<"b">> -> <<"\b">>;
+      <<"f">> -> <<"\f">>;
+      <<"n">> -> <<"\n">>;
+      <<"r">> -> <<"\r">>;
+      <<"t">> -> <<"\t">>;
+      <<"v">> -> <<"\v">>; %% or "\x{0B}"
+      _       -> Char
+    end
+  %};
 
 zeroEscapeSequence
-  <- "\\0" !digit; % { return "\x00"; }
+  <- "\\0" !digit
+  %{
+    "\x{00}"
+  %};
 
 hexEscapeSequence
-  %% digits have to be $'fied
   <- "\\x" digits:(hexDigit hexDigit)
-   `
-      [Pre, Digits0] = Node,
-      [Pre, lists:flatten(Digits0)]
-      %return String.fromCharCode(parseInt(digits, 16));
-   `;
+  %{
+    Digits0 = get_value(digits, Node),
+    Digits1 = [binary_to_list(D) || D <- Digits0],
+    Digits = list_to_integer(lists:flatten(Digits1), 16),
+    unicode:characters_to_binary([Digits])
+  %};
 
 unicodeEscapeSequence
-  %% digits have to be $'fied
   <- "\\u" digits:(hexDigit hexDigit hexDigit hexDigit)
-   `
-      [Pre, Digits0] = Node,
-      [Pre, lists:flatten(Digits0)]
-%      return String.fromCharCode(parseInt(digits, 16));
-   `;
+  %{
+    Digits0 = get_value(digits, Node),
+    Digits1 = [binary_to_list(D) || D <- Digits0],
+    Digits = list_to_integer(lists:flatten(Digits1), 16),
+    unicode:characters_to_binary([Digits])
+  %}
+   ;
 
 eolEscapeSequence
-  <- "\\" eol:eol; % { return eol; }
+  <- "\\" eol:eol
+  %{
+    Eol = get_value(eol, Node),
+    Eol
+  %};
 
 digit
   <- [0-9];
@@ -409,5 +491,40 @@ whitespace
   <- [ \\t\\v\\f\\x{00A0}\\x{FEFF}\\x{1680}\\x{180E}\\x{2000}-\\x{200A}\\x{202F}\\x{205F}\\x{3000}];
 
 `
--type index() :: any().
+-record(ast, {data = []}).
+
+-type index() :: {Line::integer(), Column::integer()}.
+
+-spec get_value(atom(), proplists:proplist()) -> term().
+get_value(_, #ast{}) ->
+  [];
+get_value(K, L) ->
+  case lists:keyfind(K, 1, L) of
+    false  -> [];
+    {_, V} -> V
+  end.
+
+-spec get_attr(atom(), #ast{}) -> term().
+get_attr(K, #ast{data = L}) ->
+  get_value(K, L).
+
+
+-spec quote_for_regexp_class(string()) -> string().
+%% Note: Unlike PEG.js, we don't need to escape Unicode symbols for regexps
+quote_for_regexp_class(<<$\\>>) -> <<$\\, $\\>>; % backslash
+quote_for_regexp_class(<<$/>>) -> <<$\\, $\\, $/>>; % closing slash
+quote_for_regexp_class(<<$]>>) -> <<$\\, $\\, $]>>; % closing bracket
+quote_for_regexp_class(<<$^>>) -> <<$\\, $\\, $^>>; % caret
+quote_for_regexp_class(<<$->>) -> <<$\\, $\\, $->>; % dash
+quote_for_regexp_class(<<$\0>>) -> <<$\\, $\\, $0>>; % null
+quote_for_regexp_class(<<$\t>>) -> <<$\\, $\\, $t>>; % horizontal tab
+quote_for_regexp_class(<<$\n>>) -> <<$\\, $\\, $n>>; % line feed
+quote_for_regexp_class(<<$\v>>) -> <<$\\, $\\, $v>>; % vertical tab
+quote_for_regexp_class(<<$\f>>) -> <<$\\, $\\, $f>>; % form feed
+quote_for_regexp_class(<<$\r>>) -> <<$\\, $\\, $r>>; % carriage return
+quote_for_regexp_class(C) -> C.
+
+
+stringify(AST) ->
+    << <<C>> || <<C>> <- lists:flatten(AST) >>.
 `

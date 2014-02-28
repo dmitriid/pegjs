@@ -3,43 +3,32 @@ grammar
   %{
     Initializer = get_value('initializer', Node),
     Rules = get_value('rules', Node),
-    #ast{data = [
-      {type,        "grammar"},
-      {initializer, Initializer},
-      {rules,       Rules}
-    ]}
+    #grammar{ initializer = Initializer
+            , rules       = Rules
+            , index       = Index
+            }
   %};
 
 initializer
   <- code:action semicolon?
   %{
     Code = get_value('code', Node),
-    #ast{data = [
-      {type, "initializer"},
-      {code, Code}
-    ]}
+    #code{ code  = Code
+         , index = Index
+         }
   %};
 
 rule
   <- name:identifier displayName:string? equals expression:expression semicolon?
   %{
-    Expression = get_value(expression, Node),
-    Name       = get_value(name, Node),
-    case get_value(displayName, Node) of
-      [] ->
-        Expression;
-      DisplayName ->
-        #ast{data = [
-          {type,        "rule"},
-          {name,        Name},
-          {expression,  [
-                          {type,       "named"},
-                          {name,       DisplayName},
-                          {expression, Expression}
-                        ]
-          }
-        ]}
-     end
+    Expression  = get_value(expression, Node),
+    Name        = get_value(name, Node),
+    DisplayName = get_value(displayName, Node),
+    #rule{ name         = Name
+         , display_name = DisplayName
+         , expression   = Expression
+         , index        = Index
+         }
   %};
 
 expression
@@ -63,10 +52,9 @@ choice
                           Tail
                         ),
         Alternatives = lists:reverse(Alternatives0),
-        #ast{data = [
-          {type, "choice"},
-          {alternatives, Alternatives}
-        ]}
+        #choice{ alternatives = Alternatives
+               , index        = Index
+               }
     end
   %};
 
@@ -82,26 +70,33 @@ sequence
     Code     = get_value('code', Node0),
     Expression = case Elements of
                    [OneElement] -> OneElement;
-                   _ -> #ast{data = [
-                                      {type, "sequence"},
-                                      {elements, Elements}
-                                    ]}
+                   _ ->
+                    Elements
                  end,
-    case Code of
-      [] ->
-        Expression;
-      _     ->
-        #ast{data = [
-          {type, "action"},
-          {expression, Expression},
-          {code, Code}
-        ]}
-    end
+    #sequence{ elements = Expression
+             , code     = #code{ code  = Code
+                               , index = Index
+                               }
+             , index    = Index
+             }
   %};
 
 labeled
   <- label:identifier colon expression:prefixed
-  / prefixed;
+  / prefixed
+  %{
+    case Node of
+      [{_, Label}, _, {_, Expression}] ->
+        #labeled{ label      = Label
+                , expression = Expression
+                , index      = Index
+                };
+      Expression ->
+        #labeled{ expression = Expression
+                , index      = Index
+                }
+    end
+  %};
 
 prefixed
   <- dollar:dollar expression:suffixed
@@ -126,36 +121,35 @@ prefixed
               _  ->
                 case Code of
                   [] -> % not:not expression:suffixed
-                    #ast{data = [
-                      {type, "simple_not"},
-                      {expression, Expression}
-                    ]};
+                    #prefixed{ type       = simple_not
+                             , expression = Expression
+                             , index      = Index
+                             };
                   _  -> % not:not code:action
-                    #ast{data = [
-                      {type, "semantic_not"},
-                      {code, Code}
-                    ]}
+                    #prefixed{ type  = semantic_not
+                             , code  = Code
+                             , index = Index
+                             }
                 end
             end;
           _  ->
             case Code of
               [] -> % and:and expression:suffixed
-                #ast{data = [
-                  {type, "simple_and"},
-                  {expression, Expression}
-                ]};
+                #prefixed{ type       = simple_and
+                         , expression = Expression
+                         , index      = Index
+                         };
               _  -> % and:and code:action
-                #ast{data = [
-                  {type, "semantic_and"},
-                  {code, Code}
-                ]}
+                 #prefixed{ type  = semantic_and
+                          , code  = Code
+                          , index = Index
+                          }
             end
         end;
-      _ ->  % ollar:dollar expression:suffixed
-        #ast{data = [
-          {type, "text"},
-          {expression, Expression}
-        ]}
+      _ ->  % dollar:dollar expression:suffixed
+        #text{ expression = Expression
+             , index      = Index
+             }
     end
   %};
 
@@ -172,20 +166,20 @@ suffixed
       _  ->
         case Suffix of
           <<"?">> ->
-            #ast{data = [
-              {type, "optional"},
-              {expression, Expression}
-            ]};
+            #suffixed{ type       = optional
+                     , expression = Expression
+                     , index      = Index
+                     };
           <<"*">> ->
-            #ast{data = [
-              {type, "zero_or_more"},
-              {expression, Expression}
-            ]};
+            #suffixed{ type       = zero_or_more
+                     , expression = Expression
+                     , index      = Index
+                     };
           <<"+">> ->
-            #ast{data = [
-              {type, "one_or_more"},
-              {expression, Expression}
-            ]}
+            #suffixed{ type       = one_or_more
+                     , expression = Expression
+                     , index      = Index
+                     }
         end
     end
   %};
@@ -198,12 +192,12 @@ primary
   / lparen expression:expression rparen
   %{
     case Node of
-      <<".">> -> [{type, "any"}];
+      <<".">> ->
+        #anything{ index = Index };
       [_, _] ->
-        #ast{data = [
-          {type, "rule_ref"},
-          {name, get_value('name', Node)}
-        ]};
+        #rule_ref{ name  = get_value('name', Node)
+                 , index = Index
+                 };
       [_, _, _] ->
         get_value('expression', Node);
       _ ->
@@ -279,11 +273,9 @@ identifier
 literal
   <- value:(doubleQuotedString / singleQuotedString) flags:"i"? __
   %{
-  #ast{data= [
-    {type, "literal"},
-    {value, get_value('value', Node)},
-    {ignoreCase, get_value('flags', Node) == <<"i">>}
-  ]}
+  #literal{ value      = get_value('value', Node)
+          , ignore_case = get_value('flags', Node) == <<"i">>
+          }
   %};
 
 string
@@ -330,7 +322,7 @@ simpleSingleQuotedCharacter
   <- !("'" / "\\" / eolChar) char_:.
   %{
     get_value('char_', Node)
-  %}; % { return char_; }
+  %};
 
 class
   <- "[" inverted:"^"? parts:(classCharacterRange / classCharacter)* "]" flags:"i"? __
@@ -491,18 +483,78 @@ whitespace
   <- [ \\t\\v\\f\\x{00A0}\\x{FEFF}\\x{1680}\\x{180E}\\x{2000}-\\x{200A}\\x{202F}\\x{205F}\\x{3000}];
 
 `
+%% A literal string
+-record(literal, { value :: unicode:chardata()
+                 , ignore_case :: boolean
+                 , index :: index()
+                 }).
+
+-record(code, { code  :: unicode:chardata()
+              , index :: index()
+              }).
+
+%% The '.' parsing expression
+-record(anything, {
+          index :: index()
+         }).
+
+-record(rule_ref, { name  :: unicode:chardata()
+                  , index :: index()
+                  }).
+
+-record(suffixed, { type       :: atom()
+                  , expression :: []
+                  , index      :: index()
+                  }).
+
+-record(prefixed, { type       :: atom()
+                  , expression :: []
+                  , code       :: #code{}
+                  , index      :: index()
+                  }).
+
+-record(labeled,  { label      :: unicode:chardata()
+                  , expression :: []
+                  , index      :: index()
+                  }).
+
+-record(text, { expression :: []
+              , index      :: index()
+              }).
+
+-record(sequence, { elements :: []
+                  , code     :: #code{}
+                  , index    :: index()
+                  }).
+
+-record(choice, { alternatives :: []
+                , index        :: index()
+                }).
+
+-record(rule, { name         :: unicode:chardata()
+              , display_name :: unicode:chardata()
+              , expression   :: []
+              , index        :: index()
+              }).
+
+-record(grammar, { initializer :: #code{}
+                 , rules       :: [#rule{}]
+                 , index       :: index()
+                 }).
+
 -record(ast, {data = []}).
 
 -type index() :: {Line::integer(), Column::integer()}.
 
 -spec get_value(atom(), proplists:proplist()) -> term().
-get_value(_, #ast{}) ->
-  [];
-get_value(K, L) ->
+get_value(K, L) when is_list(L)->
   case lists:keyfind(K, 1, L) of
     false  -> [];
     {_, V} -> V
-  end.
+  end;
+get_value(_, _) ->
+  [].
+
 
 -spec get_attr(atom(), #ast{}) -> term().
 get_attr(K, #ast{data = L}) ->

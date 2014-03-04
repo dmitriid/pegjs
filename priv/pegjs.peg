@@ -339,41 +339,40 @@ class
                , "]"
                , Flags/binary
               >>,
-    #ast{data = [
-      {type, "class"},
-      {parts, PartsConverted},
-      {raw_text, RawText},
-      {inverted, Inverted == <<"^">>},
-      {ignore_case, Flags == <<"i">>}
-    ]}
+    #regexp{ parts       = PartsConverted
+           , raw_text    = RawText
+           , inverted    = Inverted == <<"^">>
+           , ignore_case = Flags == <<"i">>
+           , index       = Index
+           }
   %};
 
 classCharacterRange
   <- begin:classCharacter "-" end:classCharacter
   %{
     Begin = get_value('begin', Node),
-    End = get_value('end', Node),
+    End   = get_value('end', Node),
     RawBegin = get_attr(raw_text, Begin),
-    RawEnd = get_attr(raw_text, End),
+    RawEnd   = get_attr(raw_text, End),
     case Begin > End of
       true ->
         error({invalid_character_range, {RawBegin, RawEnd}});
       false ->
-        #ast{data = [
-          {data, [get_value(data, Begin), get_value(data, End)]},
-          {raw_text, <<RawBegin/binary, "-", RawEnd/binary>>}
-        ]}
+        #character_range{ 'begin'  = get_value(data, Begin)
+                        , 'end'    = get_value(data, End)
+                        , raw_text = <<RawBegin/binary, "-", RawEnd/binary>>
+                        , index    = Index
+                        }
     end
   %};
 
 classCharacter
   <- bracketDelimitedCharacter
   %{
-    #ast{data = [
-                   {data, Node},
-                   {raw_text, quote_for_regexp_class(Node)}
-                 ]
-         }
+    #charclass{ data     = Node
+              , raw_text = quote_for_regexp_class(Node)
+              , index    = Index
+              }
   %};
 
 bracketDelimitedCharacter
@@ -483,68 +482,7 @@ whitespace
   <- [ \\t\\v\\f\\x{00A0}\\x{FEFF}\\x{1680}\\x{180E}\\x{2000}-\\x{200A}\\x{202F}\\x{205F}\\x{3000}];
 
 `
-%% A literal string
--record(literal, { value :: unicode:chardata()
-                 , ignore_case :: boolean
-                 , index :: index()
-                 }).
-
--record(code, { code  :: unicode:chardata()
-              , index :: index()
-              }).
-
-%% The '.' parsing expression
--record(anything, {
-          index :: index()
-         }).
-
--record(rule_ref, { name  :: unicode:chardata()
-                  , index :: index()
-                  }).
-
--record(suffixed, { type       :: atom()
-                  , expression :: []
-                  , index      :: index()
-                  }).
-
--record(prefixed, { type       :: atom()
-                  , expression :: []
-                  , code       :: #code{}
-                  , index      :: index()
-                  }).
-
--record(labeled,  { label      :: unicode:chardata()
-                  , expression :: []
-                  , index      :: index()
-                  }).
-
--record(text, { expression :: []
-              , index      :: index()
-              }).
-
--record(sequence, { elements :: []
-                  , code     :: #code{}
-                  , index    :: index()
-                  }).
-
--record(choice, { alternatives :: []
-                , index        :: index()
-                }).
-
--record(rule, { name         :: unicode:chardata()
-              , display_name :: unicode:chardata()
-              , expression   :: []
-              , index        :: index()
-              }).
-
--record(grammar, { initializer :: #code{}
-                 , rules       :: [#rule{}]
-                 , index       :: index()
-                 }).
-
--record(ast, {data = []}).
-
--type index() :: {Line::integer(), Column::integer()}.
+-include("pegjs.hrl").
 
 -spec get_value(atom(), proplists:proplist()) -> term().
 get_value(K, L) when is_list(L)->
@@ -556,10 +494,9 @@ get_value(_, _) ->
   [].
 
 
--spec get_attr(atom(), #ast{}) -> term().
-get_attr(K, #ast{data = L}) ->
-  get_value(K, L).
-
+-spec get_attr(atom(), #charclass{}) -> term().
+get_attr(raw_text, #charclass{raw_text = RawText}) ->
+  RawText.
 
 -spec quote_for_regexp_class(string()) -> string().
 %% Note: Unlike PEG.js, we don't need to escape Unicode symbols for regexps

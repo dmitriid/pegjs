@@ -1,0 +1,209 @@
+%% -type index() :: {{line, pos_integer()}, {column, pos_integer()}}.
+-type input() :: binary().
+-type parse_failure() :: {fail, term()}.
+-type parse_success() :: {term(), input(), index()}.
+-type parse_result() :: parse_failure() | parse_success().
+-type parse_fun() :: fun((input(), index()) -> parse_result()).
+-type xform_fun() :: fun((input(), index()) -> term()).
+
+-spec pegjs(input(), index(), binary(), parse_fun(), xform_fun()) -> parse_result().
+pegjs(Inp, StartIndex, Name, ParseFun, TransformFun) ->
+  case get_memo(StartIndex, Name) of      % See if the current reduction is memoized
+    {ok, Memo} -> %Memo;                     % If it is, return the stored result
+      Memo;
+    _ ->                                        % If not, attempt to parse
+      Result = case ParseFun(Inp, StartIndex) of
+        {fail,_} = Failure ->                       % If it fails, memoize the failure
+          Failure;
+        {Match, InpRem, NewIndex} ->               % If it passes, transform and memoize the result.
+          Transformed = TransformFun(Match, StartIndex),
+          {Transformed, InpRem, NewIndex}
+      end,
+      memoize(StartIndex, Name, Result),
+      Result
+  end.
+
+-spec setup_memo() -> ets:tid().
+setup_memo() ->
+  put({parse_memo_table, ?MODULE}, ets:new(?MODULE, [set])).
+
+-spec release_memo() -> true.
+release_memo() ->
+  ets:delete(memo_table_name()).
+
+-spec memoize(index(), atom(), term()) -> true.
+memoize(Index, Name, Result) ->
+  Memo = case ets:lookup(memo_table_name(), Index) of
+              [] -> [];
+              [{Index, Plist}] -> Plist
+         end,
+  ets:insert(memo_table_name(), {Index, [{Name, Result}|Memo]}).
+
+-spec get_memo(index(), atom()) -> {ok, term()} | {error, not_found}.
+get_memo(Index, Name) ->
+  case ets:lookup(memo_table_name(), Index) of
+    [] -> {error, not_found};
+    [{Index, Plist}] ->
+      case proplists:lookup(Name, Plist) of
+        {Name, Result}  -> {ok, Result};
+        _  -> {error, not_found}
+      end
+    end.
+
+-spec memo_table_name() -> ets:tid().
+memo_table_name() ->
+    get({parse_memo_table, ?MODULE}).
+
+pegjs_combinator('eof') ->
+  fun(<<>>, Index) -> {eof, [], Index};
+     (_, Index) -> {fail, {expected, eof, Index}} end;
+
+pegjs_combinator('anything') ->
+  fun(<<>>, Index) -> {fail, {expected, any_character, Index}};
+     (Input, Index) when is_binary(Input) ->
+          <<C/utf8, Rest/binary>> = Input,
+          {<<C/utf8>>, Rest, p_advance_index(<<C/utf8>>, Index)}
+  end.
+
+pegjs_combinator('optional', P) ->
+  fun(Input, Index) ->
+      case P(Input, Index) of
+        {fail,_} -> {[], Input, Index};
+        {_, _, _} = Success -> Success
+      end
+  end;
+
+pegjs_combinator('not', P) ->
+  fun(Input, Index)->
+      case P(Input,Index) of
+        {fail,_} ->
+          {[], Input, Index};
+        {Result, _, _} -> {fail, {expected, {no_match, Result},Index}}
+      end
+  end;
+
+pegjs_combinator('assert', P) ->
+  fun(Input,Index) ->
+      case P(Input,Index) of
+        {fail,_} = Failure-> Failure;
+        _ -> {[], Input, Index}
+      end
+  end;
+
+pegjs_combinator('seq', P) ->
+  fun(Input, Index) ->
+      pegjs_combinator('all', {P, Input, Index, []})
+  end;
+
+
+pegjs_combinator('all', {[], Inp, Index, Accum}) -> {lists:reverse( Accum ), Inp, Index};
+pegjs_combinator('all', {[P|Parsers], Inp, Index, Accum}) ->
+  case P(Inp, Index) of
+    {fail, _} = Failure -> Failure;
+    {Result, InpRem, NewIndex} -> pegjs_combinator('all', {Parsers, InpRem, NewIndex, [Result|Accum]})
+  end;
+
+pegjs_combinator('choose', Parsers) ->
+  fun(Input, Index) ->
+      pegjs_combinator('attempt', {Parsers, Input, Index, none})
+  end;
+
+
+pegjs_combinator('attempt', {[], _Input, _Index, Failure}) -> Failure;
+pegjs_combinator('attempt', {[P|Parsers], Input, Index, FirstFailure})->
+  case P(Input, Index) of
+    {fail, _} = Failure ->
+      case FirstFailure of
+        none -> pegjs_combinator('attempt', {Parsers, Input, Index, Failure});
+        _ -> pegjs_combinator('attempt', {Parsers, Input, Index, FirstFailure})
+      end;
+    Result -> Result
+  end;
+
+pegjs_combinator('zero_or_more', P) ->
+  fun(Input, Index) ->
+      pegjs_combinator('scan', {P, Input, Index, []})
+  end;
+
+pegjs_combinator('one_or_more', P) ->
+  fun(Input, Index)->
+      Result = pegjs_combinator('scan', {P, Input, Index, []}),
+      case Result of
+        {[_|_], _, _} ->
+          Result;
+        _ ->
+          {fail, {expected, Failure, _}} = P(Input,Index),
+          {fail, {expected, {at_least_one, Failure}, Index}}
+      end
+  end;
+
+pegjs_combinator('label', {Tag, P}) ->
+  fun(Input, Index) ->
+      case P(Input, Index) of
+        {fail,_} = Failure ->
+           Failure;
+        {Result, InpRem, NewIndex} ->
+          {{Tag, Result}, InpRem, NewIndex}
+      end
+  end;
+
+pegjs_combinator('scan', { _, [], Index, Accum}) -> {lists:reverse( Accum ), [], Index};
+pegjs_combinator('scan', {P, Inp, Index, Accum}) ->
+  case P(Inp, Index) of
+    {fail,_} -> {lists:reverse(Accum), Inp, Index};
+    {Result, InpRem, NewIndex} -> pegjs_combinator('scan', {P, InpRem, NewIndex, [Result | Accum]})
+  end;
+
+pegjs_combinator('string', S) ->
+    Length = erlang:byte_size(S),
+    fun(Input, Index) ->
+      try
+          <<S:Length/binary, Rest/binary>> = Input,
+          {S, Rest, p_advance_index(S, Index)}
+      catch
+          error:{badmatch,_} -> {fail, {expected, {string, S}, Index}}
+      end
+    end;
+
+pegjs_combinator('charclass', Class) ->
+    {ok, RE} = re:compile(Class, [unicode, dotall]),
+    fun(Inp, Index) ->
+            case re:run(Inp, RE, [anchored]) of
+                {match, [{0, Length}|_]} ->
+                    {Head, Tail} = erlang:split_binary(Inp, Length),
+                    {Head, Tail, p_advance_index(Head, Index)};
+                _ -> {fail, {expected, {character_class, binary_to_list(Class)}, Index}}
+            end
+    end;
+
+pegjs_combinator('regexp', Regexp) ->
+    {ok, RE} = re:compile(Regexp, [unicode, dotall, anchored]),
+    fun(Inp, Index) ->
+        case re:run(Inp, RE) of
+            {match, [{0, Length}|_]} ->
+                {Head, Tail} = erlang:split_binary(Inp, Length),
+                {Head, Tail, p_advance_index(Head, Index)};
+            _ -> {fail, {expected, {regexp, binary_to_list(Regexp)}, Index}}
+        end
+    end;
+
+pegjs_combinator(Name, _) ->
+  {error, {invalid_combinator, Name}}.
+
+-spec line(index() | term()) -> pos_integer() | undefined.
+line({{line,L},_}) -> L;
+line(_) -> undefined.
+
+-spec column(index() | term()) -> pos_integer() | undefined.
+column({_,{column,C}}) -> C;
+column(_) -> undefined.
+
+
+p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
+  lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
+p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters
+  {{line, Line}, {column, Col}} = Index,
+  case MatchedInput of
+    $\n -> {{line, Line+1}, {column, 1}};
+    _ -> {{line, Line}, {column, Col+1}}
+  end.

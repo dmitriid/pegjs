@@ -13,29 +13,20 @@
 %%_* Includes ==================================================================
 -include("pegjs.hrl").
 
-%%_* Defines ===================================================================
--record(analysis, { combinators    = orddict:new()
-                  , errors         = ordsets:new()
-                  , required_rules = orddict:new()
-                  , unique_rules   = orddict:new()
-                  }).
-
 %%_* API =======================================================================
--spec file(string()) -> list().
+-spec file(string()) -> {#grammar{}, #analysis{}} | {error, term()}.
 file(FileName) ->
-  case pegjs:file(FileName) of
-    #grammar{} = G ->
-      analyze(G);
-    E ->
-      E
+  case pegjs_parse:file(FileName) of
+    #grammar{} = G -> analyze(G);
+    E              -> E
   end.
 
 -spec analyze(#grammar{}) -> list().
-analyze(#grammar{rules = Rules}) ->
+analyze(#grammar{rules = Rules} = Grammar) ->
   Analysis0 = analyze(Rules, #analysis{}),
   Analysis = #analysis{errors = Errors} = verify(Analysis0),
   case Errors of
-    [] -> Analysis;
+    []   -> {Grammar, Analysis};
     List -> {error, List}
   end.
 

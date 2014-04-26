@@ -78,3 +78,10 @@
                  }).
 
 -type index() :: {Line :: integer(), Column :: integer()}.
+
+
+-record(analysis, { combinators = orddict:new()
+                  , errors = ordsets:new()
+                  , required_rules = orddict:new()
+                  , unique_rules = orddict:new()
+                  }).

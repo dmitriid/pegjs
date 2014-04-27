@@ -28,6 +28,8 @@ get_value(_, _) ->
 
 -spec get_attr(atom(), #charclass{}) -> term().
 get_attr(raw_text, #charclass{raw_text = RawText}) ->
+  RawText;
+get_attr(raw_text, #character_range{raw_text = RawText}) ->
   RawText.
 
 -spec quote_for_regexp_class(string()) -> string().
@@ -47,7 +49,19 @@ quote_for_regexp_class(C) -> C.
 
 
 stringify(AST) ->
-    << <<C>> || <<C>> <- lists:flatten(AST) >>.
+  B = lists:flatten(AST),
+  Out = [escape(C) || C <- B],
+  iolist_to_binary(Out).
+
+escape(<<>>) -> [];
+escape(<<$\">>) -> <<"\\\"">>;
+escape(<<$\n>>) -> <<"\\n">>;
+escape(<<$\r>>) -> <<"\\r">>;
+escape(<<$\f>>) -> <<"\\f">>;
+escape(<<$\t>>) -> <<"\\t">>;
+escape(<<$\\>>) -> <<"\\\\">>;
+escape(<<B:1/binary>>) -> B;
+escape(<<B:1/binary, Rest/binary>>) -> [escape(B), escape(Rest)].
 
 -spec file(file:name()) -> any().
 file(Filename) -> case file:read_file(Filename) of {ok,Bin} -> parse(Bin); Err -> Err end.
@@ -338,7 +352,7 @@ parse(Input) when is_binary(Input) ->
 -spec 'literal'(input(), index()) -> parse_result().
 'literal'(Input, Index) ->
   p(Input, Index, 'literal', fun(I,D) -> (p_seq([p_label('value', p_choose([fun 'doubleQuotedString'/2, fun 'singleQuotedString'/2])), p_label('flags', p_optional(p_string(<<"i">>))), fun '__'/2]))(I,D) end, fun(Node, _Idx) ->
-  #literal{ value      = get_value('value', Node)
+  #literal{ value       = get_value('value', Node)
           , ignore_case = get_value('flags', Node) == <<"i">>
           }
    end).
@@ -397,7 +411,7 @@ parse(Input) when is_binary(Input) ->
                , Flags/binary
               >>,
     #regexp{ parts       = PartsConverted
-           , raw_text    = RawText
+           , raw_text    = stringify(RawText)
            , inverted    = Inverted == <<"^">>
            , ignore_case = Flags == <<"i">>
            , index       = Index

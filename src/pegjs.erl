@@ -264,5 +264,5 @@ chain([F|T], Input0) ->
 to_output_binary(Atom) when is_atom(Atom) ->
   atom_to_binary(Atom, unicode);
 to_output_binary(Binary) when is_binary(Binary) ->
-  <<"\"", Binary/binary, "\"">>.
+  ["<<\"", Binary, "\">>"].
 

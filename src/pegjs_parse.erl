@@ -45,15 +45,30 @@ quote_for_regexp_class(<<$\n>>) -> <<$\\, $\\, $n>>; % line feed
 quote_for_regexp_class(<<$\v>>) -> <<$\\, $\\, $v>>; % vertical tab
 quote_for_regexp_class(<<$\f>>) -> <<$\\, $\\, $f>>; % form feed
 quote_for_regexp_class(<<$\r>>) -> <<$\\, $\\, $r>>; % carriage return
+quote_for_regexp_class(<<C0:1/binary>>) when C0 =< <<127>> -> % ASCII
+  [C] = binary_to_list(C0),
+  <<$\\, $x, (to_hex(C))/binary>>;
+quote_for_regexp_class(C) when C =< 127 ->  <<$\\, $x, (to_hex(C))/binary>>; % standalone ASCII
 quote_for_regexp_class(C) -> C.
 
+to_hex(C0) when is_binary(C0) ->
+  [C] = binary_to_list(C0),
+  to_hex(C);
+to_hex(C) when is_integer(C), C =< 127 ->
+  to_hex(integer_to_list(C, 16));
+to_hex([C | []]) ->
+  list_to_binary(["0", C]);
+to_hex(Hex) when is_list(Hex) ->
+  list_to_binary(Hex);
+to_hex(Other) ->
+  <<Other>>.
 
-stringify(AST) ->
-  B = lists:flatten(AST),
-  Out = [escape(C) || C <- B],
-  iolist_to_binary(Out).
+stringify(AST) when is_list(AST) ->
+  stringify(iolist_to_binary(AST));
+stringify(AST) when is_binary(AST) ->
+  escape(AST).
 
-escape(<<>>) -> [];
+escape(<<>>) -> <<>>;
 escape(<<$\">>) -> <<"\\\"">>;
 escape(<<$\n>>) -> <<"\\n">>;
 escape(<<$\r>>) -> <<"\\r">>;
@@ -61,7 +76,8 @@ escape(<<$\f>>) -> <<"\\f">>;
 escape(<<$\t>>) -> <<"\\t">>;
 escape(<<$\\>>) -> <<"\\\\">>;
 escape(<<B:1/binary>>) -> B;
-escape(<<B:1/binary, Rest/binary>>) -> [escape(B), escape(Rest)].
+escape(<<B:1/binary, Rest/binary>>) -> << (escape(B))/binary
+                                        , (escape(Rest))/binary>>.
 
 -spec file(file:name()) -> any().
 file(Filename) -> case file:read_file(Filename) of {ok,Bin} -> parse(Bin); Err -> Err end.
@@ -484,7 +500,7 @@ parse(Input) when is_binary(Input) ->
     Digits0 = get_value(digits, Node),
     Digits1 = [binary_to_list(D) || D <- Digits0],
     Digits = list_to_integer(lists:flatten(Digits1), 16),
-    unicode:characters_to_binary([Digits])
+    stringify(unicode:characters_to_binary([Digits]))
    end).
 
 -spec 'unicodeEscapeSequence'(input(), index()) -> parse_result().

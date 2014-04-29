@@ -135,8 +135,9 @@ generate_api_functions(#input{ grammar = #grammar{rules = Rules}
     , "parse(Input, Root) when is_binary(Input) ->\n"
     , "  setup_memo(),\n"
     , "  Result = case pegjs_rule(Root, Input,{{line,1},{column,1}}) of\n"
-    , "             {AST, <<>>, _Index} -> AST;\n"
-    , "             Any -> Any\n"
+    , "             {AST, <<>>, _Index}     -> AST;\n"
+    , "             {_AST, Unparsed, Index} -> {error, {could_not_parse, {Unparsed, Index}}};\n"
+    , "             {error, Error}          -> {error, Error}\n"
     , "           end,\n"
     , "  release_memo(),\n"
     , "Result.\n\n"
@@ -176,7 +177,7 @@ write_rule( #rule{ expression = Expression
         , "       , Index\n"
         , "       , <<\"", Name, "\">>\n"
         , "       , fun(I, D) ->\n"
-        , "           ", generate_combinators(Expression), "\n"
+        , "           (", generate_combinators(Expression), ")(I, D)\n"
         , "         end\n"
         , "       , fun(Node, _Idx) -> Node end\n"
         , "       )"
@@ -200,7 +201,7 @@ generate_combinators(#text{expression = Expression}) ->
   generate_combinator(<<"'text'">>, generate_combinators(Expression));
 generate_combinators(#labeled{ expression = Expression
                              , label = Label}) ->
-  generate_combinator( <<"'label'">>
+  generate_combinator( <<"'labeled'">>
                      , to_output_binary(Label)
                      , generate_combinators(Expression));
 generate_combinators(#prefixed{expression = Expression, type = Type}) ->
@@ -238,17 +239,28 @@ generate_combinator(Name) ->
 
 -spec generate_combinator(binary(), binary() | iolist()) -> iolist().
 generate_combinator(Name, Args) when is_binary(Args) ->
-  [ "pegjs_combinator(", Name, ", ", Args, ")"];
+  [ "pegjs_combinator(", Name, ", ", args_to_iolist(Args), ")"];
 generate_combinator(Name, Args) ->
-  [ "pegjs_combinator(", Name, ", [", Args, "])"].
+  [ "pegjs_combinator(", Name, ", ", args_to_iolist(Args), ")"].
 
 -spec generate_combinator(binary(), binary(), iolist()) -> iolist().
 generate_combinator(Name, Args1, Args2) ->
-  [ "pegjs_combinator(", Name, ", {", Args1, ", [", Args2, "]})"].
+  [ "pegjs_combinator(", Name, ", {", args_to_iolist(Args1), ", "
+  , args_to_iolist(Args2), "})"].
 
 -spec generate_combinator(binary(), binary(), binary(), binary()) -> iolist().
 generate_combinator(Name, Arg1, Arg2, Arg3) ->
-  [ "pegjs_combinator(", Name, ", {", Arg1, ", ", Arg2, ", ", Arg3 ,"})"].
+  [ "pegjs_combinator(", Name, ", {"
+  , args_to_iolist(Arg1), ", ", args_to_iolist(Arg2), ", "
+  , args_to_iolist(Arg3) ,"})"].
+
+
+-spec args_to_iolist(binary() | list()) -> iolist().
+args_to_iolist(List) when is_list(List) ->
+  ["[", List, "]"];
+args_to_iolist(Binary) when is_binary(Binary) ->
+  Binary.
+
 
 %%_* Helpers ===================================================================
 -spec chain([chain_func()], #input{}) -> ok | {error, term()}.
@@ -264,5 +276,5 @@ chain([F|T], Input0) ->
 to_output_binary(Atom) when is_atom(Atom) ->
   atom_to_binary(Atom, unicode);
 to_output_binary(Binary) when is_binary(Binary) ->
-  ["<<\"", Binary, "\">>"].
+  <<"<<\"", Binary/binary, "\">>">>.
 

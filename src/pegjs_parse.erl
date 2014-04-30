@@ -424,9 +424,8 @@ parse(Input) when is_binary(Input) ->
                , Inverted/binary
                , PartsRawText/binary
                , "]"
-               , Flags/binary
               >>,
-    #regexp{ parts       = PartsConverted
+    #regexp{ parts       = stringify(PartsConverted)
            , raw_text    = stringify(RawText)
            , inverted    = Inverted == <<"^">>
            , ignore_case = Flags == <<"i">>

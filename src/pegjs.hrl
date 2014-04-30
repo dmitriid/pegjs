@@ -5,6 +5,7 @@
                  }).
 
 -record(code, { code :: unicode:chardata()
+              , used_variables :: list()
               , index :: index()
               }).
 

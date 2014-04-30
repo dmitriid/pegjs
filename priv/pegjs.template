@@ -55,9 +55,7 @@ get_memo(Index, Name) ->
 memo_table_name() ->
     get({parse_memo_table, ?MODULE}).
 
-pegjs_combinator('eof') ->
-  fun(<<>>, Index) -> {eof, [], Index};
-     (_, Index) -> {error, {expected, eof, Index}} end;
+%%_* Implemented combinators ===================================================
 
 pegjs_combinator('anything') ->
   fun(<<>>, Index) -> {error, {expected, any_character, Index}};
@@ -65,8 +63,6 @@ pegjs_combinator('anything') ->
           <<C/utf8, Rest/binary>> = Input,
           {<<C/utf8>>, Rest, p_advance_index(<<C/utf8>>, Index)}
   end.
-
-%%_* Implemented combinators ===================================================
 
 pegjs_combinator('choice', Parsers) ->
   fun(Input, Index) ->
@@ -94,6 +90,16 @@ pegjs_combinator('all', {[P|Parsers], Inp, Index, Accum}) ->
   case P(Inp, Index) of
     {error, _} = Failure -> Failure;
     {Result, InpRem, NewIndex} -> pegjs_combinator('all', {Parsers, InpRem, NewIndex, [Result|Accum]})
+  end;
+
+pegjs_combinator('text', [P]) ->
+  fun(Input, Index) ->
+      Result = P(Input, Index),
+      case Result of
+        {error, _} = E -> E;
+        {IoList, NewInput, NewIndex} ->
+          {iolist_to_binary(IoList), NewInput, NewIndex}
+      end
   end;
 
 pegjs_combinator('labeled', {Tag, [P]}) ->
@@ -168,10 +174,7 @@ pegjs_combinator('literal', {String, IsCaseInsensitive}) ->
                      end,
           case IsCaseInsensitive of
             false ->
-              {error, { match_failed
-                     , {expected_string, {String, Modifier}
-                     , {actual_string, Input}
-                     }, Index}};
+              {error, {match_failed, {{String, Modifier}, Input}, Index}};
             true ->
               case re:run( Input
                          , <<"^", String/binary, "(.*)">>
@@ -188,34 +191,32 @@ pegjs_combinator('literal', {String, IsCaseInsensitive}) ->
                   , p_advance_index(String, Index)
                   };
                 nomatch    ->
-                  {error, { match_failed
-                         , {expected_string, {String, Modifier}
-                         , {actual_string, Input}
-                         }, Index}}
+                  {error, {match_failed, {{String, Modifier}, Input}, Index}}
               end
           end
       end
     end;
 
-pegjs_combinator('charclass', Class) ->
-    {ok, RE} = re:compile(Class, [unicode, dotall]),
-    fun(Inp, Index) ->
-            case re:run(Inp, RE, [anchored]) of
-                {match, [{0, Length}|_]} ->
-                    {Head, Tail} = erlang:split_binary(Inp, Length),
-                    {Head, Tail, p_advance_index(Head, Index)};
-                _ -> {error, {expected, {character_class, binary_to_list(Class)}, Index}}
-            end
-    end;
-
-pegjs_combinator('regexp', Regexp) ->
-    {ok, RE} = re:compile(Regexp, [unicode, dotall, anchored]),
+pegjs_combinator('regexp', {Regexp, IsIgnoreCase}) ->
+    Options0 = [unicode, dotall, anchored],
+    Options = case IsIgnoreCase of
+                true  -> [caseless | Options0];
+                false -> Options0
+              end,
+    {ok, RE} = re:compile(Regexp, Options),
     fun(Inp, Index) ->
         case re:run(Inp, RE) of
             {match, [{0, Length}|_]} ->
                 {Head, Tail} = erlang:split_binary(Inp, Length),
                 {Head, Tail, p_advance_index(Head, Index)};
-            _ -> {error, {expected, {regexp, binary_to_list(Regexp)}, Index}}
+            _ ->
+              Modifier = case IsIgnoreCase of
+                             true  -> case_insensitive;
+                             false -> case_sensitive
+                           end,
+              {error, { expected
+                      , {regexp, binary_to_list(Regexp), Modifier}
+                      , Index}}
         end
     end;
 

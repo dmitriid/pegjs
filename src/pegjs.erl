@@ -136,7 +136,7 @@ generate_api_functions(#input{ grammar = #grammar{rules = Rules}
     , "  setup_memo(),\n"
     , "  Result = case pegjs_rule(Root, Input,{{line,1},{column,1}}) of\n"
     , "             {AST, <<>>, _Index}     -> AST;\n"
-    , "             {_AST, Unparsed, Index} -> {error, {could_not_parse, {Unparsed, Index}}};\n"
+    , "             {_AST, Unparsed, Index} -> {error, {no_match, {Unparsed, Index}}};\n"
     , "             {error, Error}          -> {error, Error}\n"
     , "           end,\n"
     , "  release_memo(),\n"
@@ -216,15 +216,11 @@ generate_combinators(#rule_ref{name = Name}) ->
   generate_combinator( <<"'rule_ref'">>, to_output_binary(Name));
 generate_combinators(#anything{}) ->
   generate_combinator( <<"'anything'">>);
-generate_combinators(#character_range{raw_text = Text}) ->
-  generate_combinator( <<"'character_range'">>, to_output_binary(Text));
-generate_combinators(#regexp{ raw_text = Text
-                            , inverted = Inverted
+generate_combinators(#regexp{ raw_text = RawText
                             , ignore_case = IgnoreCase
                             }) ->
   generate_combinator( <<"'regexp'">>
-                     , to_output_binary(Text)
-                     , to_output_binary(Inverted)
+                     , to_output_binary(RawText)
                      , to_output_binary(IgnoreCase));
 generate_combinators(#code{code = Code}) ->
   generate_combinator(<<"'code'">>, Code);
@@ -247,13 +243,6 @@ generate_combinator(Name, Args) ->
 generate_combinator(Name, Args1, Args2) ->
   [ "pegjs_combinator(", Name, ", {", args_to_iolist(Args1), ", "
   , args_to_iolist(Args2), "})"].
-
--spec generate_combinator(binary(), binary(), binary(), binary()) -> iolist().
-generate_combinator(Name, Arg1, Arg2, Arg3) ->
-  [ "pegjs_combinator(", Name, ", {"
-  , args_to_iolist(Arg1), ", ", args_to_iolist(Arg2), ", "
-  , args_to_iolist(Arg3) ,"})"].
-
 
 -spec args_to_iolist(binary() | list()) -> iolist().
 args_to_iolist(List) when is_list(List) ->

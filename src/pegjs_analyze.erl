@@ -117,10 +117,15 @@ add_rule_ref( Name
 
 
 -spec verify(#analysis{}) -> ok | {error, term()}.
-verify(Analysis0) ->
+verify(Analysis) ->
 %%   Analysis1 = verify_required_rules(Analysis0),
 %%   verify_extra_rules(Analysis1).
-  verify_required_rules(Analysis0).
+  chain( [ fun verify_required_rules/1
+         , fun verify_multiple_roots/1
+         , fun verify_code/1
+         ]
+       , Analysis
+       ).
 
 -spec verify_required_rules(#analysis{}) -> #analysis{}.
 verify_required_rules(#analysis{ errors = Errors0
@@ -140,16 +145,38 @@ verify_required_rules(#analysis{ errors = Errors0
       Analysis0#analysis{errors = Errors}
   end.
 
-%% -spec verify_extra_rules(#analysis{}) -> #analysis{}.
-%% verify_extra_rules(#analysis{ errors = Errors0
-%%                             , required_rules = Required
-%%                             , unique_rules = Unique
-%%                             } = Analysis0) ->
-%%   case ordsets:subtract(Unique, Required) of
-%%     []   -> Analysis0;
-%%     List ->
-%%       Errors = ordsets:add_element( {unused_rules_present, List}
-%%                                   , Errors0
-%%                                   ),
-%%       Analysis0#analysis{errors = Errors}
-%%   end.
+-spec verify_multiple_roots(#analysis{}) -> #analysis{}.
+verify_multiple_roots(#analysis{ errors = Errors0
+                               , required_rules = Required
+                               , unique_rules = Unique
+                               } = Analysis0) ->
+  RequiredKeys = orddict:fetch_keys(Required),
+  UniqueKeys = orddict:fetch_keys(Unique),
+  case lists:subtract(UniqueKeys, RequiredKeys) of
+    []   -> Analysis0;
+    List when length(List) =:= 1 -> Analysis0;
+    KeyList0 ->
+      KeyList = [  {Name, orddict:fetch(Name, Unique)}
+                || Name <- KeyList0],
+      Errors = ordsets:add_element( {multiple_roots, lists:usort(KeyList)}
+                                  , Errors0
+                                  ),
+      Analysis0#analysis{errors = Errors}
+  end.
+
+-spec verify_code(#analysis{}) -> #analysis{}.
+verify_code(#analysis{ errors = Errors0
+                     } = Analysis0) ->
+  %% we have to descend through the entire AST and deal with every nook and
+  %% cranny where code blocks may appear. For eve ry code block:
+  %% - check it's validity
+  %% - check it's used variables
+  %% - update the code block with the info we gather
+  Analysis0.
+
+%%_* Helpers ===================================================================
+-spec chain([chain_func()], #analysis{}) -> ok | {error, term()}.
+-type chain_func() :: fun((#analysis{}) -> {ok, #analysis{}} | {error, term()}).
+chain([], Analysis) -> Analysis;
+chain([F | T], Analysis) ->
+  chain(T, F(Analysis)).

@@ -22,8 +22,8 @@ file(FileName) ->
   end.
 
 -spec analyze(#grammar{}) -> list().
-analyze(#grammar{rules = Rules} = Grammar) ->
-  Analysis0 = analyze(Rules, #analysis{}),
+analyze(#grammar{} = Grammar) ->
+  Analysis0 = analyze(Grammar, #analysis{}),
   Analysis = #analysis{errors = Errors} = verify(Analysis0),
   case Errors of
     []   -> {Grammar, Analysis};
@@ -38,19 +38,28 @@ analyze([], #analysis{} = A) ->
 analyze([Rule | Tail], Analysis0) ->
   Analysis = analyze(Rule, Analysis0),
   analyze(Tail, Analysis);
+analyze( #grammar{rules = Rules, initializer = Initializer}
+       , Analysis) ->
+  analyze(Rules, add_code(Initializer, Analysis));
 analyze( #rule{expression = Expression, index = Index, name = Name}
        , Analysis) ->
   analyze(Expression, add_rule(Name, Analysis, Index));
 analyze( #choice{alternatives = Alternatives, index = Index}, Analysis) ->
   analyze(Alternatives, add_combinator(choice, Analysis, Index));
-analyze( #sequence{elements = Elements, index = Index}, Analysis) ->
-  analyze(Elements, add_combinator(sequence, Analysis, Index));
+analyze( #sequence{elements = Elements, code = Code, index = Index}
+       , Analysis) ->
+  analyze(Elements, add_code( Code
+                            , add_combinator(sequence, Analysis, Index)
+                            ));
 analyze( #text{expression = Expression, index = Index}, Analysis) ->
   analyze(Expression, add_combinator(choice, Analysis, Index));
 analyze( #labeled{expression = Expression, index = Index}, Analysis) ->
   analyze(Expression, add_combinator(labeled, Analysis, Index));
-analyze( #prefixed{expression = Expression, index = Index}, Analysis) ->
-  analyze(Expression, add_combinator(prefixed, Analysis, Index));
+analyze( #prefixed{expression = Expression, code = Code, index = Index}
+       , Analysis) ->
+  analyze(Expression, add_code( Code
+                              , add_combinator(prefixed, Analysis, Index)
+                              ));
 analyze( #suffixed{expression = Expression, index = Index}, Analysis) ->
   analyze(Expression, add_combinator(suffixed, Analysis, Index));
 analyze( #rule_ref{name = Name, index = Index}, Analysis) ->
@@ -115,6 +124,18 @@ add_rule_ref( Name
                   end,
   Analysis0#analysis{required_rules = RequiredRules}.
 
+-spec add_code(binary() | list(), #analysis{}) -> #analysis{}.
+add_code( #code{code = Source, index = Index}
+        , #analysis{code = Code0} = Analysis0) ->
+  Code = case Source of
+           [] -> Code0;
+           <<>> -> Code0;
+           _ -> orddict:store(Index, Source, Code0)
+         end,
+  Analysis0#analysis{code = Code};
+add_code([], Analysis) ->
+  Analysis.
+
 
 -spec verify(#analysis{}) -> ok | {error, term()}.
 verify(Analysis) ->
@@ -165,14 +186,30 @@ verify_multiple_roots(#analysis{ errors = Errors0
   end.
 
 -spec verify_code(#analysis{}) -> #analysis{}.
-verify_code(#analysis{ errors = Errors0
-                     } = Analysis0) ->
-  %% we have to descend through the entire AST and deal with every nook and
-  %% cranny where code blocks may appear. For eve ry code block:
-  %% - check it's validity
-  %% - check it's used variables
-  %% - update the code block with the info we gather
-  Analysis0.
+verify_code(#analysis{ code   = Code0
+                     , errors = Errors0
+                     } = Analysis) ->
+  {CodeErrors, Code} = verify_code(Code0, [], []),
+  Errors = case CodeErrors of
+             [] -> Errors0;
+             _ -> ordsets:add_element({invalid_code, CodeErrors}, Errors0)
+           end,
+  Analysis#analysis{code = Code, errors = Errors}.
+
+-spec verify_code(list(), list(), list()) -> {list(), list()}.
+verify_code([], Errors, Accum) ->
+  {Errors, lists:reverse(Accum)};
+verify_code([{Index, Code} | T], Errors, Accum) ->
+  case verify_code_block(Code) of
+    {error, Reason} ->
+      verify_code(T, [{Reason, Index} | Errors], Accum);
+    {ok, Vars} ->
+      verify_code(T, Errors, [{Code, Vars, Index} | Accum])
+  end.
+
+-spec verify_code_block(binary()) -> {ok, list()} | {error, term()}.
+verify_code_block(_Code) ->
+  {ok, []}.
 
 %%_* Helpers ===================================================================
 -spec chain([chain_func()], #analysis{}) -> ok | {error, term()}.

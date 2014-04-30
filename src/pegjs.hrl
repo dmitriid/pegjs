@@ -5,7 +5,6 @@
                  }).
 
 -record(code, { code :: unicode:chardata()
-              , used_variables :: list()
               , index :: index()
               }).
 
@@ -85,4 +84,5 @@
                   , errors = ordsets:new()
                   , required_rules = orddict:new()
                   , unique_rules = orddict:new()
+                  , code = orddict:new()
                   }).

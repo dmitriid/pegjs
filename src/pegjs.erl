@@ -27,7 +27,7 @@ file(FileName) ->
 
 -spec file(string(), proplists:proplist()) -> ok | {error, term()}.
 file(FileName, Options) ->
-  Basename = filename:basename(FileName, ".peg"),
+  Basename = filename:rootname(filename:basename(FileName)),
   InputDir = filename:dirname(FileName),
   ModuleName = proplists:get_value(module, Options, list_to_atom(Basename)),
   OutputDir = proplists:get_value(output, Options, InputDir),

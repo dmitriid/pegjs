@@ -143,7 +143,9 @@ add_code(_, Analysis) ->
 
 -spec add_initializer(binary() | list(), #analysis{}) -> #analysis{}.
 add_initializer( #code{code = Source}, Analysis0) ->
-  Analysis0#analysis{initializer = Source}.
+  Analysis0#analysis{initializer = Source};
+add_initializer(_, Analysis) ->
+  Analysis.
 
 
 -spec verify(#analysis{}) -> ok | {error, term()}.

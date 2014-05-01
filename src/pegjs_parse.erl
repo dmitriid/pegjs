@@ -215,7 +215,9 @@ parse(Input) when is_binary(Input) ->
                              };
                   _  -> % not:not code:action
                     #prefixed{ type  = semantic_not
-                             , code  = Code
+                             , code  = #code{ code  = Code
+                                            , index = Index
+                                            }
                              , index = Index
                              }
                 end
@@ -229,7 +231,9 @@ parse(Input) when is_binary(Input) ->
                          };
               _  -> % and:and code:action
                  #prefixed{ type  = semantic_and
-                          , code  = Code
+                          , code  = #code{ code  = Code
+                                         , index = Index
+                                         }
                           , index = Index
                           }
             end

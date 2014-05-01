@@ -97,7 +97,7 @@ pegjs_combinator('all', {[P|Parsers], Inp, Index, Accum}, TransformFun) ->
     {Result, InpRem, NewIndex} -> pegjs_combinator('all', {Parsers, InpRem, NewIndex, [Result|Accum]}, TransformFun)
   end;
 
-pegjs_combinator('text', [P], _) ->
+pegjs_combinator('text', P, _) ->
   fun(Input, Index) ->
       Result = P(Input, Index),
       case Result of
@@ -125,7 +125,7 @@ pegjs_combinator('prefixed', {simple_not, [P]}, _) ->
       case P(Input,Index) of
         {error,_} ->
           {[], Input, Index};
-        {Result, _, _} -> {error, {expected, {no_match, Result},Index}}
+        {Result, _, _} -> {error, {expected, {no_match, Result}, Index}}
       end
   end;
 pegjs_combinator('prefixed', {simple_and, [P]}, _) ->
@@ -133,6 +133,20 @@ pegjs_combinator('prefixed', {simple_and, [P]}, _) ->
     case P(Input, Index) of
       {error, _} = Failure -> Failure;
       _ -> {[], Input, Index}
+    end
+  end;
+pegjs_combinator('prefixed', {semantic_and, _}, TransformFun) ->
+  fun(Input, Index) ->
+    case TransformFun(Input, Index) of
+      {error, Reason} -> {error, {Reason, Index}};
+      _ -> {[], Input, Index}
+    end
+  end;
+pegjs_combinator('prefixed', {semantic_not, _}, TransformFun) ->
+  fun(Input, Index) ->
+    case TransformFun(Input, Index) of
+      {error, _} -> {[], Input, Index};
+      Result -> {error, {expected, {no_match, Result}, Index}}
     end
   end;
 

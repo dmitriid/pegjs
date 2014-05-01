@@ -235,9 +235,9 @@ generate_combinators(#prefixed{ expression = Expression
                                                , generate_combinators(Expression))
                      , generate_transform(Code));
 generate_combinators(#suffixed{expression = Expression, type = Type}) ->
-  generate_combinator_args( <<"'suffixed'">>
-                          , generate_combinator_args( to_output_binary(Type)
-                                                    , generate_combinators(Expression)));
+  generate_combinator( <<"'suffixed'">>
+                     , generate_combinator_args( to_output_binary(Type)
+                     , generate_combinators(Expression)));
 generate_combinators(#rule_ref{name = Name}) ->
   generate_combinator(<<"'rule_ref'">>, to_output_binary(Name));
 generate_combinators(#anything{}) ->
@@ -253,7 +253,9 @@ generate_combinators(#code{code = Code}) ->
 generate_combinators(#literal{value = Value, ignore_case = IgnoreCase}) ->
   generate_combinator( <<"'literal'">>
                      , generate_combinator_args( to_output_binary(Value)
-                                               , to_output_binary(IgnoreCase))).
+                                               , to_output_binary(IgnoreCase)));
+generate_combinators(undefined) ->
+  <<"undefined">>.
 
 -spec generate_combinator(binary()) -> iolist().
 generate_combinator(Name) ->

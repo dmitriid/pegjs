@@ -57,9 +57,14 @@ analyze( #labeled{expression = Expression, index = Index}, Analysis) ->
   analyze(Expression, add_combinator(labeled, Analysis, Index));
 analyze( #prefixed{expression = Expression, code = Code, index = Index}
        , Analysis) ->
-  analyze(Expression, add_code( Code
-                              , add_combinator(prefixed, Analysis, Index)
-                              ));
+  case Expression of
+   undefined ->
+      add_code(Code
+        , add_combinator(prefixed, Analysis, Index)
+      );
+    _ ->
+      analyze(Expression, add_combinator(prefixed, Analysis, Index))
+  end;
 analyze( #suffixed{expression = Expression, index = Index}, Analysis) ->
   analyze(Expression, add_combinator(suffixed, Analysis, Index));
 analyze( #rule_ref{name = Name, index = Index}, Analysis) ->

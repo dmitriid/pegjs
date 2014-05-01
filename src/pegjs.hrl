@@ -85,4 +85,5 @@
                   , required_rules = orddict:new()
                   , unique_rules = orddict:new()
                   , code = orddict:new()
+                  , initializer = <<>>
                   }).

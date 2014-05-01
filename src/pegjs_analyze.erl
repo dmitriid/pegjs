@@ -40,7 +40,7 @@ analyze([Rule | Tail], Analysis0) ->
   analyze(Tail, Analysis);
 analyze( #grammar{rules = Rules, initializer = Initializer}
        , Analysis) ->
-  analyze(Rules, add_code(Initializer, Analysis));
+  analyze(Rules, add_initializer(Initializer, Analysis));
 analyze( #rule{expression = Expression, index = Index, name = Name}
        , Analysis) ->
   analyze(Expression, add_rule(Name, Analysis, Index));
@@ -136,6 +136,10 @@ add_code( #code{code = Source, index = Index}
 add_code(_, Analysis) ->
   Analysis.
 
+-spec add_initializer(binary() | list(), #analysis{}) -> #analysis{}.
+add_initializer( #code{code = Source}, Analysis0) ->
+  Analysis0#analysis{initializer = Source}.
+
 
 -spec verify(#analysis{}) -> ok | {error, term()}.
 verify(Analysis) ->
@@ -143,6 +147,7 @@ verify(Analysis) ->
 %%   verify_extra_rules(Analysis1).
   chain( [ fun verify_required_rules/1
          , fun verify_multiple_roots/1
+         , fun verify_initializer/1
          , fun verify_code/1
          ]
        , Analysis
@@ -184,6 +189,13 @@ verify_multiple_roots(#analysis{ errors = Errors0
                                   ),
       Analysis0#analysis{errors = Errors}
   end.
+
+-spec verify_initializer(#analysis{}) -> #analysis{}.
+verify_initializer(#analysis{ initializer = _Initializer
+                            , errors = _Errors0
+                            } = Analysis) ->
+  %% Don't know how to properly verify this yet
+  Analysis.
 
 -spec verify_code(#analysis{}) -> #analysis{}.
 verify_code(#analysis{ code   = Code0

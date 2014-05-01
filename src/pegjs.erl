@@ -62,6 +62,7 @@ generate(Input) ->
   case chain([ fun generate_module_attributes/1
              , fun generate_combinator_defines/1
              , fun generate_api_functions/1
+             , fun generate_initializer/1
              , fun generate_rules/1
              , fun generate_code/1
              , fun write_combinators/1
@@ -136,6 +137,13 @@ generate_api_functions(#input{ grammar = #grammar{rules = Rules}
     , "Result.\n\n"
     ],
   file:write(OutputFile, Out),
+  {ok, Input}.
+
+-spec generate_initializer(#input{}) -> {ok, #input{}} | {error, term()}.
+generate_initializer(#input{ analysis = #analysis{initializer = Initializer}
+                           , output_file = OutputFile} = Input) ->
+  file:write(OutputFile, Initializer),
+  file:write(OutputFile, "\n\n"),
   {ok, Input}.
 
 -spec generate_rules(#input{}) -> {ok, #input{}} | {error, term()}.

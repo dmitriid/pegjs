@@ -133,7 +133,7 @@ add_code( #code{code = Source, index = Index}
            _ -> orddict:store(Index, Source, Code0)
          end,
   Analysis0#analysis{code = Code};
-add_code([], Analysis) ->
+add_code(_, Analysis) ->
   Analysis.
 
 
@@ -189,7 +189,7 @@ verify_multiple_roots(#analysis{ errors = Errors0
 verify_code(#analysis{ code   = Code0
                      , errors = Errors0
                      } = Analysis) ->
-  {CodeErrors, Code} = verify_code(Code0, [], []),
+  {CodeErrors, Code} = verify_code(Code0, [], orddict:new()),
   Errors = case CodeErrors of
              [] -> Errors0;
              _ -> ordsets:add_element({invalid_code, CodeErrors}, Errors0)
@@ -198,18 +198,44 @@ verify_code(#analysis{ code   = Code0
 
 -spec verify_code(list(), list(), list()) -> {list(), list()}.
 verify_code([], Errors, Accum) ->
-  {Errors, lists:reverse(Accum)};
+  {Errors, Accum};
 verify_code([{Index, Code} | T], Errors, Accum) ->
   case verify_code_block(Code) of
     {error, Reason} ->
       verify_code(T, [{Reason, Index} | Errors], Accum);
     {ok, Vars} ->
-      verify_code(T, Errors, [{Code, Vars, Index} | Accum])
+      verify_code(T, Errors, orddict:store(Index, {Code, Vars}, Accum))
   end.
 
 -spec verify_code_block(binary()) -> {ok, list()} | {error, term()}.
-verify_code_block(_Code) ->
-  {ok, []}.
+verify_code_block(Source0) ->
+  Source = binary_to_list(Source0),
+  case erl_scan:string(Source) of
+    {error, Info, Location} ->
+      {error, {Info, Location}};
+    {ok, Tokens, EndLocation} ->
+      %% We add the dot token so that it makes a complete
+      %% expression list.
+      case erl_parse:parse_exprs(Tokens ++ [{dot, EndLocation}]) of
+        {ok, _ExprList} ->
+          %% Find which arguments are used so they can be
+          %% applied to the generated function.
+          Vars = used_transform_variables(Tokens),
+          {ok, Vars};
+        {error, {_, _, Info}} ->
+          {error, iolist_to_binary(Info)}
+      end
+  end.
+
+used_transform_variables(Tokens) ->
+    ordsets:to_list(lists:foldl(fun used_transform_variables/2,
+                                ordsets:new(), Tokens)).
+
+used_transform_variables({var, _, 'Node'}, Acc) ->
+  ordsets:add_element(<<"Node">>, Acc);
+used_transform_variables({var, _, 'Idx'}, Acc) ->
+  ordsets:add_element(<<"Idx">>, Acc);
+used_transform_variables(_, Acc) -> Acc.
 
 %%_* Helpers ===================================================================
 -spec chain([chain_func()], #analysis{}) -> ok | {error, term()}.
@@ -217,3 +243,5 @@ verify_code_block(_Code) ->
 chain([], Analysis) -> Analysis;
 chain([F | T], Analysis) ->
   chain(T, F(Analysis)).
+
+

@@ -63,6 +63,7 @@ generate(Input) ->
              , fun generate_combinator_defines/1
              , fun generate_api_functions/1
              , fun generate_rules/1
+             , fun generate_code/1
              , fun write_combinators/1
              ], Input) of
     {ok, _} -> ok;
@@ -104,14 +105,6 @@ generate_combinator_defines(#input{ analysis = #analysis{combinators = Cs}
   file:write(OutputFile, "\n"),
   {ok, Input}.
 
--spec generate_rules(#input{}) -> {ok, #input{}} | {error, term()}.
-generate_rules(#input{ grammar = #grammar{rules = Rules}
-                     , output_file = OutputFile} = Input) ->
-  file:write(OutputFile, [ "-spec pegjs_rule(binary(), "
-                         , "binary(), tuple()) -> any().\n"]),
-  write_rules(Rules, OutputFile),
-  {ok, Input}.
-
 -spec generate_api_functions(#input{}) -> {ok, #input{}} | {error, term()}.
 generate_api_functions(#input{ grammar = #grammar{rules = Rules}
                              , output_file = OutputFile} = Input) ->
@@ -144,6 +137,25 @@ generate_api_functions(#input{ grammar = #grammar{rules = Rules}
     ],
   file:write(OutputFile, Out),
   {ok, Input}.
+
+-spec generate_rules(#input{}) -> {ok, #input{}} | {error, term()}.
+generate_rules(#input{ grammar = #grammar{rules = Rules}
+                     , output_file = OutputFile} = Input) ->
+  file:write(OutputFile, [ "-spec pegjs_rule(binary(), "
+                         , "binary(), tuple()) -> any().\n"]),
+  write_rules(Rules, OutputFile),
+  {ok, Input}.
+
+-spec generate_code(#input{}) -> {ok, #input{}} | {error, term()}.
+generate_code(#input{ analysis = #analysis{code = Code}
+                    , output_file = OutputFile} = Input) ->
+  orddict:fold( fun(Key, Value, _) ->
+                  Out = generate_code_fun(Key, Value),
+                  file:write(OutputFile, Out)
+                end
+              , ok, Code),
+  {ok, Input}.
+
 
 -spec write_combinators(#input{}) -> {ok, #input{}} | {error, term()}.
 write_combinators(#input{output_file = OutputFile} = Input) ->
@@ -194,55 +206,66 @@ generate_combinators([Head | T]) ->
   , generate_combinators(T)
   ];
 generate_combinators(#choice{alternatives = Alternatives}) ->
-  generate_combinator(<<"'choice'">>, generate_combinators(Alternatives));
-generate_combinators(#sequence{elements = Elements}) ->
-  generate_combinator(<<"'sequence'">>, generate_combinators(Elements));
+  generate_combinator( <<"'choice'">>
+                     , generate_combinator_args(generate_combinators(Alternatives)));
+generate_combinators(#sequence{elements = Elements, code = Code}) ->
+  generate_combinator( <<"'sequence'">>
+                     , generate_combinator_args(generate_combinators(Elements))
+                     , generate_transform(Code));
 generate_combinators(#text{expression = Expression}) ->
   generate_combinator(<<"'text'">>, generate_combinators(Expression));
 generate_combinators(#labeled{ expression = Expression
                              , label = Label}) ->
   generate_combinator( <<"'labeled'">>
-                     , to_output_binary(Label)
-                     , generate_combinators(Expression));
-generate_combinators(#prefixed{expression = Expression, type = Type}) ->
+                     , generate_combinator_args( to_output_binary(Label)
+                                               , generate_combinators(Expression)));
+generate_combinators(#prefixed{ expression = Expression
+                              , type = Type
+                              , code = Code}) ->
   generate_combinator( <<"'prefixed'">>
-                     , to_output_binary(Type)
-                     , generate_combinators(Expression));
+                     , generate_combinator_args( to_output_binary(Type)
+                                               , generate_combinators(Expression))
+                     , generate_transform(Code));
 generate_combinators(#suffixed{expression = Expression, type = Type}) ->
-  generate_combinator( <<"'suffixed'">>
-                     , to_output_binary(Type)
-                     , generate_combinators(Expression));
+  generate_combinator_args( <<"'suffixed'">>
+                          , generate_combinator_args( to_output_binary(Type)
+                                                    , generate_combinators(Expression)));
 generate_combinators(#rule_ref{name = Name}) ->
-  generate_combinator( <<"'rule_ref'">>, to_output_binary(Name));
+  generate_combinator(<<"'rule_ref'">>, to_output_binary(Name));
 generate_combinators(#anything{}) ->
   generate_combinator( <<"'anything'">>);
 generate_combinators(#regexp{ raw_text = RawText
                             , ignore_case = IgnoreCase
                             }) ->
   generate_combinator( <<"'regexp'">>
-                     , to_output_binary(RawText)
-                     , to_output_binary(IgnoreCase));
+                     , generate_combinator_args( to_output_binary(RawText)
+                                               , to_output_binary(IgnoreCase)));
 generate_combinators(#code{code = Code}) ->
   generate_combinator(<<"'code'">>, Code);
 generate_combinators(#literal{value = Value, ignore_case = IgnoreCase}) ->
   generate_combinator( <<"'literal'">>
-                     , to_output_binary(Value)
-                     , to_output_binary(IgnoreCase)).
+                     , generate_combinator_args( to_output_binary(Value)
+                                               , to_output_binary(IgnoreCase))).
 
 -spec generate_combinator(binary()) -> iolist().
 generate_combinator(Name) ->
-  [ "pegjs_combinator(", Name, ")"].
+  generate_combinator(Name, "[]").
 
--spec generate_combinator(binary(), binary() | iolist()) -> iolist().
-generate_combinator(Name, Args) when is_binary(Args) ->
-  [ "pegjs_combinator(", Name, ", ", args_to_iolist(Args), ")"];
+-spec generate_combinator(binary(), iolist()) -> iolist().
 generate_combinator(Name, Args) ->
-  [ "pegjs_combinator(", Name, ", ", args_to_iolist(Args), ")"].
+  generate_combinator(Name, Args, code_identity_fun()).
 
--spec generate_combinator(binary(), binary(), iolist()) -> iolist().
-generate_combinator(Name, Args1, Args2) ->
-  [ "pegjs_combinator(", Name, ", {", args_to_iolist(Args1), ", "
-  , args_to_iolist(Args2), "})"].
+-spec generate_combinator(binary(), iolist(), binary()) -> iolist().
+generate_combinator(Name, Args, Fun) ->
+  ["pegjs_combinator(", Name, ", ", Args, ", ", Fun ,")"].
+
+-spec generate_combinator_args(binary() | iolist()) -> iolist().
+generate_combinator_args(Args) ->
+  args_to_iolist(Args).
+
+-spec generate_combinator_args(binary(), iolist()) -> iolist().
+generate_combinator_args(Args1, Args2) ->
+  ["{", args_to_iolist(Args1), ", ", args_to_iolist(Args2), "}"].
 
 -spec args_to_iolist(binary() | list()) -> iolist().
 args_to_iolist(List) when is_list(List) ->
@@ -250,6 +273,35 @@ args_to_iolist(List) when is_list(List) ->
 args_to_iolist(Binary) when is_binary(Binary) ->
   Binary.
 
+-spec generate_transform(#code{}) -> binary().
+generate_transform(#code{code = Code, index = Index}) ->
+  case Code of
+    [] -> code_identity_fun();
+    _  -> Fun = code_fun_name(Index),  <<"fun ", Fun/binary, "/2">>
+  end.
+
+-spec code_fun_name(index()) -> binary().
+code_fun_name({{line, L}, {column, C}}) ->
+  Line = integer_to_binary(L),
+  Column = integer_to_binary(C),
+  <<"pegjs_code_", Line/binary, "_", Column/binary>>.
+
+%%_* Code generator ============================================================
+-spec generate_code_fun(index(), {binary(), ordsets:ordset()}) -> iolist().
+generate_code_fun(Index, {Code, Vars}) ->
+  NodeVar = case ordsets:is_element(<<"Node">>, Vars) of
+              true  -> <<"Node">>;
+              false -> <<"_Node">>
+            end,
+  IdxVar = case ordsets:is_element(<<"Idx">>, Vars) of
+             true  -> <<"Idx">>;
+             false -> <<"_Idx">>
+           end,
+  Fun = code_fun_name(Index),
+  [ "-spec ", Fun, "(iolist(), index()) -> parse_result().\n"
+  , Fun, "(", NodeVar, ", ", IdxVar, ") ->\n"
+  , Code, ".\n\n"
+  ].
 
 %%_* Helpers ===================================================================
 -spec chain([chain_func()], #input{}) -> ok | {error, term()}.
@@ -267,3 +319,5 @@ to_output_binary(Atom) when is_atom(Atom) ->
 to_output_binary(Binary) when is_binary(Binary) ->
   <<"<<\"", Binary/binary, "\">>">>.
 
+code_identity_fun() ->
+  <<"fun(Node, _) -> Node end">>.

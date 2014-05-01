@@ -296,7 +296,7 @@ parse(Input) when is_binary(Input) ->
 -spec 'braced'(input(), index()) -> parse_result().
 'braced'(Input, Index) ->
   p(Input, Index, 'braced', fun(I,D) -> (p_seq([p_string(<<"{">>), p_zero_or_more(p_choose([fun 'braced'/2, fun 'nonBraceCharacters'/2])), p_string(<<"}">>)]))(I,D) end, fun(Node, _Idx) ->
-    stringify(Node)
+    iolist_to_binary(Node)
    end).
 
 -spec 'nonBraceCharacters'(input(), index()) -> parse_result().

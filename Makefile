@@ -1,3 +1,3 @@
-PROJECT = neotoma
+PROJECT = pegjs
 
 include erlang.mk

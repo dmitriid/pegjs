@@ -1,0 +1,8 @@
+{application, pegjs,
+ [
+  {description, "PEG/Packrat toolkit and parser-generator, uses PEG.js grammar"},
+  {vsn, "0.1"},
+  {applications, [kernel, stdlib]},
+  {modules, []}
+ ]
+}.

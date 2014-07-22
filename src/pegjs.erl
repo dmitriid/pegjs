@@ -246,7 +246,7 @@ generate_combinators(#regexp{ raw_text = RawText
                             , ignore_case = IgnoreCase
                             }) ->
   generate_combinator( <<"'regexp'">>
-                     , generate_combinator_args( to_output_binary(RawText)
+                     , generate_combinator_args( ["unicode:characters_to_binary(\"", RawText, "\")"]
                                                , to_output_binary(IgnoreCase)));
 generate_combinators(#code{code = Code}) ->
   generate_combinator(<<"'code'">>, Code);
@@ -288,7 +288,9 @@ generate_transform(#code{code = Code, index = Index}) ->
   case Code of
     [] -> code_identity_fun();
     _  -> Fun = code_fun_name(Index),  <<"fun ", Fun/binary, "/2">>
-  end.
+  end;
+generate_transform(undefined) ->
+  code_identity_fun().
 
 -spec code_fun_name(index()) -> binary().
 code_fun_name({{line, L}, {column, C}}) ->

@@ -216,7 +216,8 @@ pegjs_combinator('literal', {String, IsCaseInsensitive}, _) ->
       end
     end;
 
-pegjs_combinator('regexp', {Regexp, IsIgnoreCase}, _) ->
+pegjs_combinator('regexp', {Regexp0, IsIgnoreCase}, _) ->
+    Regexp = unicode:characters_to_binary(Regexp0),
     Options0 = [unicode, dotall, anchored],
     Options = case IsIgnoreCase of
                 true  -> [caseless | Options0];

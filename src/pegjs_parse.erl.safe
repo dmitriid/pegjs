@@ -46,8 +46,7 @@ quote_for_regexp_class(<<$\v>>) -> <<$\\, $\\, $v>>; % vertical tab
 quote_for_regexp_class(<<$\f>>) -> <<$\\, $\\, $f>>; % form feed
 quote_for_regexp_class(<<$\r>>) -> <<$\\, $\\, $r>>; % carriage return
 quote_for_regexp_class(<<C0:1/binary>>) when C0 =< <<127>> -> % ASCII
-  [C] = binary_to_list(C0),
-  <<$\\, $x, (to_hex(C))/binary>>;
+  <<C0/binary>>;
 quote_for_regexp_class(C) when C =< 127 ->  <<$\\, $x, (to_hex(C))/binary>>; % standalone ASCII
 quote_for_regexp_class(C) -> C.
 
@@ -429,8 +428,8 @@ parse(Input) when is_binary(Input) ->
                , PartsRawText/binary
                , "]"
               >>,
-    #regexp{ parts       = stringify(PartsConverted)
-           , raw_text    = stringify(RawText)
+    #regexp{ parts       = PartsConverted
+           , raw_text    = RawText
            , inverted    = Inverted == <<"^">>
            , ignore_case = Flags == <<"i">>
            , index       = Index
@@ -446,7 +445,7 @@ parse(Input) when is_binary(Input) ->
     RawEnd   = get_attr(raw_text, End),
     case Begin > End of
       true ->
-        error({invalid_character_range, {RawBegin, RawEnd}});
+        error({invalid_character_range, {RawBegin, RawEnd, Index}});
       false ->
         #character_range{ 'begin'  = get_value(data, Begin)
                         , 'end'    = get_value(data, End)
@@ -499,20 +498,20 @@ parse(Input) when is_binary(Input) ->
 
 -spec 'hexEscapeSequence'(input(), index()) -> parse_result().
 'hexEscapeSequence'(Input, Index) ->
-  p(Input, Index, 'hexEscapeSequence', fun(I,D) -> (p_seq([p_string(<<"\\x">>), p_label('digits', p_seq([fun 'hexDigit'/2, fun 'hexDigit'/2]))]))(I,D) end, fun(Node, _Idx) ->
-    Digits0 = get_value(digits, Node),
-    Digits1 = [binary_to_list(D) || D <- Digits0],
-    Digits = list_to_integer(lists:flatten(Digits1), 16),
-    stringify(unicode:characters_to_binary([Digits]))
+  p(Input, Index, 'hexEscapeSequence', fun(I,D) -> (p_seq([p_string(<<"\\x">>), p_label('digits', p_one_or_more(fun 'hexDigit'/2))]))(I,D) end, fun(Node, _Idx) ->
+     Digits0 = get_value(digits, Node),
+     Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                         , <<>>, Digits0),
+     <<"\\x{", Digits/binary, "}">>
    end).
 
 -spec 'unicodeEscapeSequence'(input(), index()) -> parse_result().
 'unicodeEscapeSequence'(Input, Index) ->
-  p(Input, Index, 'unicodeEscapeSequence', fun(I,D) -> (p_seq([p_string(<<"\\u">>), p_label('digits', p_seq([fun 'hexDigit'/2, fun 'hexDigit'/2, fun 'hexDigit'/2, fun 'hexDigit'/2]))]))(I,D) end, fun(Node, _Idx) ->
-    Digits0 = get_value(digits, Node),
-    Digits1 = [binary_to_list(D) || D <- Digits0],
-    Digits = list_to_integer(lists:flatten(Digits1), 16),
-    unicode:characters_to_binary([Digits])
+  p(Input, Index, 'unicodeEscapeSequence', fun(I,D) -> (p_seq([p_string(<<"\\u">>), p_label('digits', p_one_or_more(fun 'hexDigit'/2))]))(I,D) end, fun(Node, _Idx) ->
+     Digits0 = get_value(digits, Node),
+     Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                         , <<>>, Digits0),
+     <<"\\x{", Digits/binary, "}">>
    end).
 
 -spec 'eolEscapeSequence'(input(), index()) -> parse_result().

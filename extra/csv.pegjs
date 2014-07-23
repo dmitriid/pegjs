@@ -9,5 +9,3 @@ quoted_field = '"' string:('""' / (!'"' .))* '"'
 field_sep = ','
 
 crlf = [\r]? [\n]
-
-crlf = [\r]? [\n]

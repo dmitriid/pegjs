@@ -1,6 +1,8 @@
 %% -type index() :: {{line, pos_integer()}, {column, pos_integer()}}.
 -type input() :: binary().
+-ifndef(index).
 -type index() :: {{line, integer()}, {column, integer()}}.
+-endif.
 -type parse_failure() :: {error, term()}.
 -type parse_success() :: {term(), input(), index()}.
 -type parse_result() :: parse_failure() | parse_success().

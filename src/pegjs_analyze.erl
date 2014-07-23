@@ -20,6 +20,7 @@
                  | {ignore_duplicates, boolean()}    %% ignore duplicate rules. Default: false
                  | {ignore_unparsed, boolean()}      %% ignore incomplete parses. Default: false
                  | {ignore_missing_rules, boolean()} %% Default: false
+                 | {parser, atom()}               %% use a different module to parse grammars. Default: pegjs_parse
                  | {root, Dir::string() | binary()}. %% root directory for @append instructions. Default: undefined
 -type options() :: [option()].
 
@@ -38,7 +39,8 @@ file(FileName, Options0) ->
                 [{root, Root} | Options0];
               _       -> Options0
             end,
-  case pegjs_parse:file(FileName) of
+  Parser = proplists:get_value(parser, Options, pegjs_parse),
+  case Parser:file(FileName) of
     #grammar{} = G -> analyze(G, Options);
     {#grammar{} = G, Unparsed, Index} ->
       case proplists:get_value(ignore_unparsed, Options, false) of
@@ -48,11 +50,11 @@ file(FileName, Options0) ->
     E              -> E
   end.
 
--spec analyze(#grammar{}) -> list().
+-spec analyze(#grammar{}) -> {#grammar{}, #analysis{}}.
 analyze(Grammar) ->
   analyze(Grammar, []).
 
--spec analyze(#grammar{}, options()) -> list().
+-spec analyze(#grammar{}, options()) -> {#grammar{}, #analysis{}}.
 analyze(#grammar{} = Grammar, Options0) ->
   Options = fill_options(Options0),
   Analysis0 = perform_analysis(Grammar, #analysis{options = Options}),
@@ -64,7 +66,7 @@ analyze(#grammar{} = Grammar, Options0) ->
 
 
 %%_* Internal ==================================================================
--spec perform_analysis(list(), #analysis{}) -> list().
+-spec perform_analysis(list(), #analysis{}) -> #analysis{}.
 perform_analysis([], #analysis{} = A) ->
   A;
 perform_analysis([Rule | Tail], Analysis0) ->

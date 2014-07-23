@@ -77,7 +77,10 @@
                  , index       :: index()
                  }).
 
+-ifndef(index).
+-define(index, {}).
 -type index() :: {Line :: integer(), Column :: integer()}.
+-endif.
 
 
 -record(analysis, { combinators    = orddict:new()

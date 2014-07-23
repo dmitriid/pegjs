@@ -102,7 +102,8 @@ pegjs_combinator('text', P, _) ->
       Result = P(Input, Index),
       case Result of
         {error, _} = E -> E;
-        {IoList, NewInput, NewIndex} ->
+        {MaybeIoList, NewInput, NewIndex} ->
+          IoList = convert_to_iolist(MaybeIoList),
           {iolist_to_binary(IoList), NewInput, NewIndex}
       end
   end;
@@ -256,3 +257,15 @@ p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single c
     $\n -> {{line, Line+1}, {column, 1}};
     _ -> {{line, Line}, {column, Col+1}}
   end.
+
+convert_to_iolist(MaybeIoList) ->
+  convert_to_iolist(MaybeIoList, []).
+
+convert_to_iolist([], Acc) ->
+  lists:reverse(Acc);
+convert_to_iolist([H | T], Acc) ->
+  convert_to_iolist(T, [convert_to_iolist(H) | Acc]);
+convert_to_iolist({Label, Value}, Acc) when is_binary(Label) ->
+  [convert_to_iolist(Value) | Acc];
+convert_to_iolist(Other, Acc) ->
+  convert_to_iolist([], [Other | Acc]).

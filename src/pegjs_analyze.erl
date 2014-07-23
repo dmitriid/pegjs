@@ -16,9 +16,11 @@
 -include("pegjs.hrl").
 
 %%_* Types =====================================================================
--type option()  :: {ignore_unused, boolean()}        %% ignore unused rules
-                 | {ignore_duplicates, boolean()}    %% ignore duplicate rules
-                 | {root, Dir::string() | binary()}. %% root directory for @append instructions
+-type option()  :: {ignore_unused, boolean()}        %% ignore unused rules. Default: true
+                 | {ignore_duplicates, boolean()}    %% ignore duplicate rules. Default: false
+                 | {ignore_unparsed, boolean()}      %% ignore incomplete parses. Default: false
+                 | {ignore_missing_rules, boolean()} %% Default: false
+                 | {root, Dir::string() | binary()}. %% root directory for @append instructions. Default: undefined
 -type options() :: [option()].
 
 -export_type([option/0, options/0]).
@@ -38,6 +40,11 @@ file(FileName, Options0) ->
             end,
   case pegjs_parse:file(FileName) of
     #grammar{} = G -> analyze(G, Options);
+    {#grammar{} = G, Unparsed, Index} ->
+      case proplists:get_value(ignore_unparsed, Options, false) of
+        true -> analyze(G, Options);
+        false -> {error, {could_not_parse, Unparsed, Index}}
+      end;
     E              -> E
   end.
 
@@ -193,18 +200,23 @@ verify(Analysis) ->
 verify_required_rules(#analysis{ errors         = Errors0
                                , required_rules = Required
                                , unique_rules   = Unique
+                               , options        = Options
                                } = Analysis0) ->
   RequiredKeys = orddict:fetch_keys(Required),
   UniqueKeys   = orddict:fetch_keys(Unique),
   case lists:subtract(RequiredKeys, UniqueKeys) of
     []   -> Analysis0;
     KeyList0 ->
-      KeyList = [  {Name, lists:usort(orddict:fetch(Name, Required))}
-                || Name <- KeyList0],
-      Errors = ordsets:add_element( {required_rules_missing, KeyList}
-                                  , Errors0
-                                  ),
-      Analysis0#analysis{errors = Errors}
+      case proplists:get_value(ignore_missing_rules, Options) of
+        true -> Analysis0;
+        false ->
+          KeyList = [  {Name, lists:usort(orddict:fetch(Name, Required))}
+                       || Name <- KeyList0],
+          Errors = ordsets:add_element( {required_rules_missing, KeyList}
+                                      , Errors0
+                                      ),
+          Analysis0#analysis{errors = Errors}
+      end
   end.
 
 -spec verify_multiple_roots(#analysis{}) -> #analysis{}.
@@ -301,6 +313,7 @@ chain([F | T], Analysis) ->
 fill_options(UserOptions) ->
   Options = [ {ignore_unused, true}
             , {ignore_duplicates, false}
+            , {ignore_missing_rules, false}
             , {root, undefined}],
 
   lists:map( fun({Key, Val}) ->

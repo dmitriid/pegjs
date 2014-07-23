@@ -69,8 +69,8 @@ generate(InputFile, OutputFile, ModuleName, Options) ->
 generate(Input) ->
   case chain([ fun generate_module_attributes/1
              , fun generate_combinator_defines/1
-             , fun generate_api_functions/1
              , fun generate_initializer/1
+             , fun generate_api_functions/1
              , fun generate_rules/1
              , fun generate_code/1
              , fun write_combinators/1

@@ -20,10 +20,8 @@ This is a rather straightforward port/implementation of the grammar defined for
 - Bootstrap
 - Support @append (see, e.g. [core-pegjs](https://github.com/for-GET/core-pegjs) 
   in the for-GET project)
-- Add more options
-  - ignore some errors (such as unused top-level rules)
+- Add more options:
   - set root for multiple grammars (when @append is implemented)
-  - set output file/directory
 - Dialyze, create dialyzer-friendly parsers
 
 ## How to use
@@ -40,6 +38,27 @@ ok
     [[[<<",">>],[[[[],[],<<"b">>]]]],
      [[<<",">>],[[[[],[],<<"c">>]]]]]}]},
  {<<"tail">>,[]}]
+```
+
+There are several options you can pass along to `pegjs:file(File, Options::options())`:
+
+```erlang
+
+-type options() :: [option()].
+
+%% options for pegjs
+
+-type option()  :: {output, Dir::string() | binary()} %% where to put the generated file
+                                                      %% Default: directory of the input file
+                 | {module, string() | binary()}      %% to change the module name
+                                                      %% Default: name of the input file
+                 | pegjs_analyze:option().
+
+%% options for pegjs_analyze
+
+-type option()  :: {ignore_unused, boolean()}        %% ignore unused rules. Default: true
+                 | {ignore_duplicates, boolean()}.   %% ignore duplicate rules. Default: false
+
 ```
 
 ## How to contribute/develop

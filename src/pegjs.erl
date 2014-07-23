@@ -20,30 +20,38 @@
                , output_file
                }).
 
+%%_* Types =====================================================================
+-type option()  :: {output, Dir::string() | binary()} %% where to put the generated file
+                 | {module, string() | binary()}
+                 | pegjs_analyze:option().
+-type options() :: [option()].
+
+-export_type([option/0, options/0]).
+
 %%_* API =======================================================================
 -spec file(string()) -> ok | {error, term()}.
 file(FileName) ->
   file(FileName, []).
 
--spec file(string(), proplists:proplist()) -> ok | {error, term()}.
+-spec file(string(), options()) -> ok | {error, term()}.
 file(FileName, Options) ->
-  Basename = filename:rootname(filename:basename(FileName)),
-  InputDir = filename:dirname(FileName),
+  Basename   = filename:rootname(filename:basename(FileName)),
+  InputDir   = filename:dirname(FileName),
   ModuleName = proplists:get_value(module, Options, list_to_atom(Basename)),
-  OutputDir = proplists:get_value(output, Options, InputDir),
+  OutputDir  = proplists:get_value(output, Options, InputDir),
   OutputFilename = filename:join(OutputDir, atom_to_list(ModuleName) ++ ".erl"),
   case {filename:absname(FileName), filename:absname(OutputFilename)} of
     {File, File} ->
       {error, input_and_output_are_the_same};
     _ ->
-      generate(FileName, OutputFilename, ModuleName)
+      generate(FileName, OutputFilename, ModuleName, Options)
   end.
 
 
 %%_* Internal ==================================================================
--spec generate(string(), string(), atom()) -> ok | {error, term()}.
-generate(InputFile, OutputFile, ModuleName) ->
-  case pegjs_analyze:file(InputFile) of
+-spec generate(string(), string(), atom(), options()) -> ok | {error, term()}.
+generate(InputFile, OutputFile, ModuleName, Options) ->
+  case pegjs_analyze:file(InputFile, Options) of
     {error, _} = E -> E;
     {Grammar, Analysis} ->
       {ok, File} = file:open(OutputFile, [write]),
@@ -167,7 +175,7 @@ generate_code(#input{ analysis = #analysis{code = Code}
 
 -spec write_combinators(#input{}) -> {ok, #input{}} | {error, term()}.
 write_combinators(#input{output_file = OutputFile} = Input) ->
-  {ok, Template} = file:read_file(filename:join([ code:priv_dir(neotoma)
+  {ok, Template} = file:read_file(filename:join([ code:priv_dir(pegjs)
                                                 , "pegjs.template"
                                                 ])
                                  ),

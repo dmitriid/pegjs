@@ -33,57 +33,58 @@
                     index :: index()
                   }).
 
--record(rule_ref, { name :: unicode:chardata()
+-record(rule_ref, { name  :: unicode:chardata()
                   , index :: index()
                   }).
 
--record(suffixed, { type :: atom()
+-record(suffixed, { type       :: atom()
                   , expression :: []
-                  , index :: index()
+                  , index      :: index()
                   }).
 
--record(prefixed, { type :: atom()
+-record(prefixed, { type       :: atom()
                   , expression :: []
-                  , code :: #code{}
-                  , index :: index()
+                  , code       :: #code{}
+                  , index      :: index()
                   }).
 
--record(labeled, { label :: unicode:chardata()
+-record(labeled, { label      :: unicode:chardata()
                  , expression :: []
-                 , index :: index()
+                 , index      :: index()
                  }).
 
 -record(text, { expression :: []
-              , index :: index()
+              , index      :: index()
               }).
 
 -record(sequence, { elements :: []
-                  , code :: #code{}
-                  , index :: index()
+                  , code     :: #code{}
+                  , index    :: index()
                   }).
 
 -record(choice, { alternatives :: []
-                , index :: index()
+                , index        :: index()
                 }).
 
--record(rule, { name :: unicode:chardata()
+-record(rule, { name         :: unicode:chardata()
               , display_name :: unicode:chardata()
-              , expression :: []
-              , index :: index()
+              , expression   :: []
+              , index        :: index()
               }).
 
 -record(grammar, { initializer :: #code{}
-                 , rules :: [#rule{}]
-                 , index :: index()
+                 , rules       :: [#rule{}]
+                 , index       :: index()
                  }).
 
 -type index() :: {Line :: integer(), Column :: integer()}.
 
 
--record(analysis, { combinators = orddict:new()
-                  , errors = ordsets:new()
+-record(analysis, { combinators    = orddict:new()
+                  , errors         = ordsets:new()
                   , required_rules = orddict:new()
-                  , unique_rules = orddict:new()
-                  , code = orddict:new()
-                  , initializer = <<>>
+                  , unique_rules   = orddict:new()
+                  , code           = orddict:new()
+                  , initializer    = <<>>
+                  , options        = []
                   }).

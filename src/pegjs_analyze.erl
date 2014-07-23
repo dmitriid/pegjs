@@ -7,23 +7,48 @@
 
 %%_* Exports ===================================================================
 -export([ analyze/1
+        , perform_analysis/2
         , file/1
+        , file/2
         ]).
 
 %%_* Includes ==================================================================
 -include("pegjs.hrl").
 
+%%_* Types =====================================================================
+-type option()  :: {ignore_unused, boolean()}        %% ignore unused rules
+                 | {ignore_duplicates, boolean()}    %% ignore duplicate rules
+                 | {root, Dir::string() | binary()}. %% root directory for @append instructions
+-type options() :: [option()].
+
+-export_type([option/0, options/0]).
+
 %%_* API =======================================================================
 -spec file(string()) -> {#grammar{}, #analysis{}} | {error, term()}.
 file(FileName) ->
+  file(FileName, []).
+
+-spec file(string(), options()) -> {#grammar{}, #analysis{}} | {error, term()}.
+file(FileName, Options0) ->
+  Options = case proplists:get_value(root, Options0) of
+              undefined ->
+                Root = filename:dirname(FileName),
+                [{root, Root} | Options0];
+              _       -> Options0
+            end,
   case pegjs_parse:file(FileName) of
-    #grammar{} = G -> analyze(G);
+    #grammar{} = G -> analyze(G, Options);
     E              -> E
   end.
 
 -spec analyze(#grammar{}) -> list().
-analyze(#grammar{} = Grammar) ->
-  Analysis0 = analyze(Grammar, #analysis{}),
+analyze(Grammar) ->
+  analyze(Grammar, []).
+
+-spec analyze(#grammar{}, options()) -> list().
+analyze(#grammar{} = Grammar, Options0) ->
+  Options = fill_options(Options0),
+  Analysis0 = perform_analysis(Grammar, #analysis{options = Options}),
   Analysis = #analysis{errors = Errors} = verify(Analysis0),
   case Errors of
     []   -> {Grammar, Analysis};
@@ -32,54 +57,55 @@ analyze(#grammar{} = Grammar) ->
 
 
 %%_* Internal ==================================================================
--spec analyze(list(), #analysis{}) -> list().
-analyze([], #analysis{} = A) ->
+-spec perform_analysis(list(), #analysis{}) -> list().
+perform_analysis([], #analysis{} = A) ->
   A;
-analyze([Rule | Tail], Analysis0) ->
-  Analysis = analyze(Rule, Analysis0),
-  analyze(Tail, Analysis);
-analyze( #grammar{rules = Rules, initializer = Initializer}
-       , Analysis) ->
-  analyze(Rules, add_initializer(Initializer, Analysis));
-analyze( #rule{expression = Expression, index = Index, name = Name}
-       , Analysis) ->
-  analyze(Expression, add_rule(Name, Analysis, Index));
-analyze( #choice{alternatives = Alternatives, index = Index}, Analysis) ->
-  analyze(Alternatives, add_combinator(choice, Analysis, Index));
-analyze( #sequence{elements = Elements, code = Code, index = Index}
-       , Analysis) ->
-  analyze(Elements, add_code( Code
-                            , add_combinator(sequence, Analysis, Index)
-                            ));
-analyze( #text{expression = Expression, index = Index}, Analysis) ->
-  analyze(Expression, add_combinator(choice, Analysis, Index));
-analyze( #labeled{expression = Expression, index = Index}, Analysis) ->
-  analyze(Expression, add_combinator(labeled, Analysis, Index));
-analyze( #prefixed{expression = Expression, code = Code, index = Index}
-       , Analysis) ->
+perform_analysis([Rule | Tail], Analysis0) ->
+  Analysis = perform_analysis(Rule, Analysis0),
+  perform_analysis(Tail, Analysis);
+perform_analysis( #grammar{rules = Rules, initializer = Initializer}
+                , Analysis) ->
+  perform_analysis(Rules, add_initializer(Initializer, Analysis));
+perform_analysis( #rule{expression = Expression, index = Index, name = Name}
+                , Analysis) ->
+  perform_analysis(Expression, add_rule(Name, Analysis, Index));
+perform_analysis( #choice{alternatives = Alternatives, index = Index}
+                , Analysis) ->
+  perform_analysis(Alternatives, add_combinator(choice, Analysis, Index));
+perform_analysis( #sequence{elements = Elements, code = Code, index = Index}
+                , Analysis) ->
+  perform_analysis(Elements, add_code( Code
+                                     , add_combinator(sequence, Analysis, Index)
+                                     ));
+perform_analysis( #text{expression = Expression, index = Index}, Analysis) ->
+  perform_analysis(Expression, add_combinator(choice, Analysis, Index));
+perform_analysis( #labeled{expression = Expression, index = Index}, Analysis) ->
+  perform_analysis(Expression, add_combinator(labeled, Analysis, Index));
+perform_analysis( #prefixed{expression = Expression, code = Code, index = Index}
+                , Analysis) ->
   case Expression of
    undefined ->
       add_code(Code
         , add_combinator(prefixed, Analysis, Index)
       );
     _ ->
-      analyze(Expression, add_combinator(prefixed, Analysis, Index))
+      perform_analysis(Expression, add_combinator(prefixed, Analysis, Index))
   end;
-analyze( #suffixed{expression = Expression, index = Index}, Analysis) ->
-  analyze(Expression, add_combinator(suffixed, Analysis, Index));
-analyze( #rule_ref{name = Name, index = Index}, Analysis) ->
+perform_analysis( #suffixed{expression = Expression, index = Index}, Analysis) ->
+  perform_analysis(Expression, add_combinator(suffixed, Analysis, Index));
+perform_analysis( #rule_ref{name = Name, index = Index}, Analysis) ->
   add_rule_ref(Name, Analysis, Index);
-analyze( #anything{index = Index}, Analysis) ->
+perform_analysis( #anything{index = Index}, Analysis) ->
   add_combinator(anything, Analysis, Index);
-analyze( #character_range{index = Index}, Analysis) ->
+perform_analysis( #character_range{index = Index}, Analysis) ->
   add_combinator(character_range, Analysis, Index);
-analyze( #charclass{index = Index}, Analysis) ->
+perform_analysis( #charclass{index = Index}, Analysis) ->
   add_combinator(charclass, Analysis, Index);
-analyze( #regexp{index = Index}, Analysis) ->
+perform_analysis( #regexp{index = Index}, Analysis) ->
   add_combinator(regexp, Analysis, Index);
-analyze( #code{index = Index}, Analysis) ->
+perform_analysis( #code{index = Index}, Analysis) ->
   add_combinator(code, Analysis, Index);
-analyze( #literal{index = Index}, Analysis) ->
+perform_analysis( #literal{index = Index}, Analysis) ->
   add_combinator(literal, Analysis, Index).
 
 -spec add_combinator(atom(), #analysis{}, index()) -> #analysis{}.
@@ -98,11 +124,14 @@ add_combinator( Name
 
 -spec add_rule(atom(), #analysis{}, index()) -> #analysis{}.
 add_rule( Name
-        , #analysis{errors = Errors0, unique_rules = UniqueRules0} = Analysis
+        , #analysis{ errors       = Errors0
+                   , unique_rules = UniqueRules0
+                   , options      = Options} = Analysis
         , Index
         ) ->
-  case orddict:is_key(Name, UniqueRules0) of
-    true  ->
+  case { orddict:is_key(Name, UniqueRules0)
+       , proplists:get_value(ignore_duplicates, Options)} of
+    {true, false}  ->
       OriginalIndex = orddict:fetch(Name, UniqueRules0),
       Errors = ordsets:add_element( { duplicate_rule
                                     , {Name, Index, OriginalIndex}
@@ -110,7 +139,7 @@ add_rule( Name
                                   , Errors0
                                   ),
       Analysis#analysis{errors = Errors};
-    false ->
+    _ ->
       UniqueRules = orddict:store(Name, Index, UniqueRules0),
       Analysis#analysis{unique_rules = UniqueRules}
   end.
@@ -161,12 +190,12 @@ verify(Analysis) ->
        ).
 
 -spec verify_required_rules(#analysis{}) -> #analysis{}.
-verify_required_rules(#analysis{ errors = Errors0
+verify_required_rules(#analysis{ errors         = Errors0
                                , required_rules = Required
-                               , unique_rules = Unique
+                               , unique_rules   = Unique
                                } = Analysis0) ->
   RequiredKeys = orddict:fetch_keys(Required),
-  UniqueKeys = orddict:fetch_keys(Unique),
+  UniqueKeys   = orddict:fetch_keys(Unique),
   case lists:subtract(RequiredKeys, UniqueKeys) of
     []   -> Analysis0;
     KeyList0 ->
@@ -179,22 +208,27 @@ verify_required_rules(#analysis{ errors = Errors0
   end.
 
 -spec verify_multiple_roots(#analysis{}) -> #analysis{}.
-verify_multiple_roots(#analysis{ errors = Errors0
+verify_multiple_roots(#analysis{ errors         = Errors0
                                , required_rules = Required
-                               , unique_rules = Unique
+                               , unique_rules   = Unique
+                               , options        = Options
                                } = Analysis0) ->
-  RequiredKeys = orddict:fetch_keys(Required),
-  UniqueKeys = orddict:fetch_keys(Unique),
-  case lists:subtract(UniqueKeys, RequiredKeys) of
-    []   -> Analysis0;
-    List when length(List) =:= 1 -> Analysis0;
-    KeyList0 ->
-      KeyList = [  {Name, orddict:fetch(Name, Unique)}
-                || Name <- KeyList0],
-      Errors = ordsets:add_element( {multiple_roots, lists:usort(KeyList)}
-                                  , Errors0
-                                  ),
-      Analysis0#analysis{errors = Errors}
+  case proplists:get_value(ignore_unused, Options) of
+    true -> Analysis0;
+    false ->
+      RequiredKeys = orddict:fetch_keys(Required),
+      UniqueKeys   = orddict:fetch_keys(Unique),
+      case lists:subtract(UniqueKeys, RequiredKeys) of
+        []   -> Analysis0;
+        List when length(List) =:= 1 -> Analysis0;
+        KeyList0 ->
+          KeyList = [  {Name, orddict:fetch(Name, Unique)}
+                       || Name <- KeyList0],
+          Errors = ordsets:add_element( {multiple_roots, lists:usort(KeyList)}
+                                      , Errors0
+                                      ),
+          Analysis0#analysis{errors = Errors}
+      end
   end.
 
 -spec verify_initializer(#analysis{}) -> #analysis{}.
@@ -263,4 +297,13 @@ chain([], Analysis) -> Analysis;
 chain([F | T], Analysis) ->
   chain(T, F(Analysis)).
 
+-spec fill_options(proplists:proplist()) -> options().
+fill_options(UserOptions) ->
+  Options = [ {ignore_unused, true}
+            , {ignore_duplicates, false}
+            , {root, undefined}],
 
+  lists:map( fun({Key, Val}) ->
+               {Key, proplists:get_value(Key, UserOptions, Val)}
+             end
+           , Options).

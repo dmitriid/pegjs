@@ -183,7 +183,7 @@ pegjs_combinator('scan', {P, Inp, Index, Accum}, TransformFun) ->
     {Result, InpRem, NewIndex} -> pegjs_combinator('scan', {P, InpRem, NewIndex, [Result | Accum]}, TransformFun)
   end;
 
-pegjs_combinator('literal', {String, IsCaseInsensitive}, _) ->
+pegjs_combinator('literal', {[String], IsCaseInsensitive}, _) ->
     Length = erlang:byte_size(String),
     fun(Input, Index) ->
       case Input of
@@ -199,7 +199,7 @@ pegjs_combinator('literal', {String, IsCaseInsensitive}, _) ->
               {error, {match_failed, {{String, Modifier}, Input}, Index}};
             true ->
               case re:run( Input
-                         , <<"^", String/binary, "(.*)">>
+                         , <<"^[", String/binary, "](.*)">>
                          , [caseless]) of
                 {match, [{_, Len}, _]} ->
                   <<Result:Len/binary, Rest/binary>> = Input,

@@ -18,6 +18,7 @@
                , grammar
                , module_name
                , output_file
+               , template
                }).
 
 %%_* Types =====================================================================
@@ -59,6 +60,7 @@ generate(InputFile, OutputFile, ModuleName, Options) ->
                               , grammar = Grammar
                               , module_name = ModuleName
                               , output_file = File
+                              , template = proplists:get_value(template, Options, "pegjs.template")
                               }
                        ),
       file:close(File),
@@ -174,9 +176,9 @@ generate_code(#input{ analysis = #analysis{code = Code}
 
 
 -spec write_combinators(#input{}) -> {ok, #input{}} | {error, term()}.
-write_combinators(#input{output_file = OutputFile} = Input) ->
+write_combinators(#input{output_file = OutputFile, template = TemplateFile} = Input) ->
   {ok, Template} = file:read_file(filename:join([ code:priv_dir(pegjs)
-                                                , "pegjs.template"
+                                                , TemplateFile
                                                 ])
                                  ),
   file:write(OutputFile, Template),
@@ -260,7 +262,7 @@ generate_combinators(#code{code = Code}) ->
   generate_combinator(<<"'code'">>, Code);
 generate_combinators(#literal{value = Value, ignore_case = IgnoreCase}) ->
   generate_combinator( <<"'literal'">>
-                     , generate_combinator_args( to_output_binary(Value)
+                     , generate_combinator_args( ["unicode:characters_to_binary(\"", Value, "\")"]
                                                , to_output_binary(IgnoreCase)));
 generate_combinators(undefined) ->
   <<"undefined">>.

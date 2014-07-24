@@ -47,10 +47,20 @@ to_hex(Hex) when is_list(Hex) ->
 to_hex(Other) ->
   <<Other>>.
 
-stringify(AST) when is_list(AST) ->
-  stringify(iolist_to_binary(AST));
-stringify(AST) when is_binary(AST) ->
-  escape(AST).
+
+do_convert_to_iolist(AST) when is_list(AST) ->
+  do_convert_to_iolist(AST, []);
+do_convert_to_iolist(AST) when is_binary(AST) ->
+  unicode:characters_to_list(AST).
+
+do_convert_to_iolist([], Acc) ->
+  lists:reverse(Acc);
+do_convert_to_iolist([H | T], Acc) ->
+  do_convert_to_iolist(T, [do_convert_to_iolist(H) | Acc]);
+do_convert_to_iolist({Label, Value}, Acc) when is_binary(Label) ->
+  [do_convert_to_iolist(Value) | Acc];
+do_convert_to_iolist(Other, Acc) ->
+  do_convert_to_iolist([], [Other | Acc]).
 
 escape(<<>>) -> <<>>;
 escape(<<$\">>) -> <<"\\\"">>;
@@ -59,9 +69,19 @@ escape(<<$\r>>) -> <<"\\r">>;
 escape(<<$\f>>) -> <<"\\f">>;
 escape(<<$\t>>) -> <<"\\t">>;
 escape(<<$\\>>) -> <<"\\\\">>;
+escape($\") -> <<"\\\"">>;
+escape($\n) -> <<"\\n">>;
+escape($\r) -> <<"\\r">>;
+escape($\f) -> <<"\\f">>;
+escape($\t) -> <<"\\t">>;
+escape($\\) -> <<"\\\\">>;
 escape(<<B:1/binary>>) -> B;
+escape(<<"\\x", _Rest/binary>> = B) -> B;
 escape(<<B:1/binary, Rest/binary>>) -> << (escape(B))/binary
-                                        , (escape(Rest))/binary>>.
+                                        , (escape(Rest))/binary>>;
+escape([H|T]) -> lists:flatten([escape(H)] ++ [escape(T)]);
+escape([]) -> <<>>;
+escape(Other) -> Other.
 }
 
 
@@ -311,7 +331,7 @@ identifier
   = chars:((letter / "_") (letter / digit / "_")*) __
   {
     [{_, Chars}, _] = Node,
-    stringify(Chars)
+    iolist_to_binary(do_convert_to_iolist(Chars))
   }
 
 /*
@@ -322,7 +342,7 @@ literal
   = value:(doubleQuotedString / singleQuotedString) flags:"i"? __
   {
     [{_, [Value]}, {_, Flags}, _] = Node,
-    #literal{ value       = Value
+    #literal{ value       = escape(lists:flatten(Value))
             , ignore_case = Flags == <<"i">>
             }
   }
@@ -338,7 +358,7 @@ doubleQuotedString
   = '"' chars:doubleQuotedCharacter* '"'
   {
     [_, {_, Chars}, _] = Node,
-    stringify(Chars)
+    Chars
   }
 
 doubleQuotedCharacter
@@ -360,7 +380,7 @@ singleQuotedString
   = "'" chars:singleQuotedCharacter* "'"
   {
     [_, {_, Chars}, _] = Node,
-    stringify(Chars)
+    Chars
   }
 
 singleQuotedCharacter

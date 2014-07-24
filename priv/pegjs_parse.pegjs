@@ -497,8 +497,8 @@ hexEscapeSequence
 unicodeEscapeSequence
   = "\\u" digits:(hexDigit+)
   {
-    [_, {_, Digits0}] = Node,
-    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+    [_, {_, [Digits0]}] = Node,
+    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
                         , <<>>, Digits0),
     <<"\\x{", Digits/binary, "}">>
   }

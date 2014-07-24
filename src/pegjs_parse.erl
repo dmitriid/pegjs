@@ -1059,8 +1059,8 @@ pegjs_code_497_1(Node, _Idx) ->
 -spec pegjs_code_506_1(iolist(), index()) -> parse_result().
 pegjs_code_506_1(Node, _Idx) ->
 
-    [_, {_, Digits0}] = Node,
-    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+    [_, {_, [Digits0]}] = Node,
+    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
                         , <<>>, Digits0),
     <<"\\x{", Digits/binary, "}">>
   .

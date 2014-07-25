@@ -66,6 +66,11 @@
                 , index        :: index()
                 }).
 
+-record(action, { expression :: []
+                , code       :: #code{}
+                , index      :: index()
+                }).
+
 -record(rule, { name         :: unicode:chardata()
               , display_name :: unicode:chardata()
               , expression   :: []

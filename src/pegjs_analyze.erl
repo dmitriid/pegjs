@@ -81,6 +81,11 @@ perform_analysis( #rule{expression = Expression, index = Index, name = Name}
 perform_analysis( #choice{alternatives = Alternatives, index = Index}
                 , Analysis) ->
   perform_analysis(Alternatives, add_combinator(choice, Analysis, Index));
+perform_analysis( #action{expression = Expression, code = Code, index = Index}
+                , Analysis) ->
+  perform_analysis(Expression, add_code(Code
+                                       , add_combinator(action, Analysis, Index)
+                                       ));
 perform_analysis( #sequence{elements = Elements, code = Code, index = Index}
                 , Analysis) ->
   perform_analysis(Elements, add_code( Code
@@ -115,7 +120,9 @@ perform_analysis( #regexp{index = Index}, Analysis) ->
 perform_analysis( #code{index = Index}, Analysis) ->
   add_combinator(code, Analysis, Index);
 perform_analysis( #literal{index = Index}, Analysis) ->
-  add_combinator(literal, Analysis, Index).
+  add_combinator(literal, Analysis, Index);
+perform_analysis( _, Analysis) ->
+  Analysis.
 
 -spec add_combinator(atom(), #analysis{}, index()) -> #analysis{}.
 add_combinator( Name

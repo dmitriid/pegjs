@@ -11,7 +11,12 @@ This is a rather straightforward port/implementation of the grammar defined for
   [Neotoma](https://github.com/seancribbs/neotoma) is also available in `priv/pegjs_parse.peg`
 - It's based on an earlier definition of the grammar (probably [this](https://github.com/dmajda/pegjs/blob/f0a6bc92cc24b623689c7811bebc1ce2921442f0/src/parser.pegjs))
   than the one that currently [exists](https://github.com/dmajda/pegjs/blob/master/src/parser.pegjs) 
-  for PEG.js. Currenlty there's no timeframe or even a decision on when/whether to update the erlang version
+  for PEG.js. 
+  
+  Current-ish [version](https://github.com/dmajda/pegjs/blob/7e3b4ec4f826036fd1f6caf7e1e3f20cc8136a6e/src/parser.pegjs) 
+  of the grammar has been ported to `priv/parser.pegjs`, but causes the VM to quit
+  with an out-of-memory exception on sufficiently large garmmars (including its own).
+  See *How to contribute* section for more info
 
 ## Further work
 
@@ -102,6 +107,32 @@ ok
 ok
 ... etc. ...
 ```
+
+### Up-to-date grammar
+
+A port of a current-ish [version](https://github.com/dmajda/pegjs/blob/7e3b4ec4f826036fd1f6caf7e1e3f20cc8136a6e/src/parser.pegjs)
+of the PEG.js grammar can be found in `priv/parser.pegjs`. `src/pegjs.erl`, 
+`src/pegjs.hrl` and `src/pegjs_analyze.erl` have all been updated to work with
+this grammar (and will generate a parser for you. Note, however, that `priv/pegjs.template`
+doesn't contain code for the `action` combinator).
+
+To generate a parser from this grammar:
+
+```erlang
+> pegjs:file("priv/parser.pegjs", [{output, "src/"}]).
+ok
+> c("src/parser.erl").
+{ok, parser}
+> pegjs:file("extra/csv.pegjs", [{parser, parser}]).
+ok
+... etc ...
+```
+
+However, the parser causes the VM to fail with an out-of-memory exception for
+sufficiently large grammars (including `parser.pegjs`). YMMV. The culprit is
+the `escape/1,2` function (see initializer section). I haven't figured out what 
+to do about this yet. 
+
 
 ### Original neotoma
 

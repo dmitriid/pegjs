@@ -223,6 +223,10 @@ generate_combinators([Head | T]) ->
   , ", "
   , generate_combinators(T)
   ];
+generate_combinators(#action{expression = Expression, code = Code}) ->
+  generate_combinator( <<"'action'">>
+                     , generate_combinator_args(generate_combinators(Expression))
+                     , generate_transform(Code));
 generate_combinators(#choice{alternatives = Alternatives}) ->
   generate_combinator( <<"'choice'">>
                      , generate_combinator_args(generate_combinators(Alternatives)));
@@ -300,6 +304,8 @@ generate_transform(#code{code = Code, index = Index}) ->
     _  -> Fun = code_fun_name(Index),  <<"fun ", Fun/binary, "/2">>
   end;
 generate_transform(undefined) ->
+  code_identity_fun();
+generate_transform(<<>>) ->
   code_identity_fun().
 
 -spec code_fun_name(index()) -> binary().

@@ -486,20 +486,20 @@ zeroEscapeSequence
   }
 
 hexEscapeSequence
-  = "\\x" digits:(hexDigit+)
+  = "\\x" digits:(hexDigit hexDigit)
   {
-    [_, {_, [Digits0]}] = Node,
-    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
-                        , <<>>, Digits0),
+    [_, {_, Digits0}] = Node,
+    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                        , <<>>, lists:flatten(Digits0)),
     <<"\\x{", Digits/binary, "}">>
   }
 
 unicodeEscapeSequence
-  = "\\u" digits:(hexDigit+)
+  = "\\u" digits:(hexDigit hexDigit hexDigit hexDigit)
   {
-    [_, {_, [Digits0]}] = Node,
-    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
-                        , <<>>, Digits0),
+    [_, {_, Digits0}] = Node,
+    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                        , <<>>, lists:flatten(Digits0)),
     <<"\\x{", Digits/binary, "}">>
   }
 

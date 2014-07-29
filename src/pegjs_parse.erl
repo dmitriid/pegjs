@@ -521,7 +521,7 @@ pegjs_rule(<<"hexEscapeSequence">>, Input, Index) ->
        , Index
        , <<"hexEscapeSequence">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\x")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('suffixed', {one_or_more, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_497_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\x")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_497_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -530,7 +530,7 @@ pegjs_rule(<<"unicodeEscapeSequence">>, Input, Index) ->
        , Index
        , <<"unicodeEscapeSequence">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\u")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('suffixed', {one_or_more, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_506_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\u")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"hexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_506_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -1050,18 +1050,18 @@ pegjs_code_488_1(_Node, _Idx) ->
 -spec pegjs_code_497_1(iolist(), index()) -> parse_result().
 pegjs_code_497_1(Node, _Idx) ->
 
-    [_, {_, [Digits0]}] = Node,
-    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
-                        , <<>>, Digits0),
+    [_, {_, Digits0}] = Node,
+    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                        , <<>>, lists:flatten(Digits0)),
     <<"\\x{", Digits/binary, "}">>
   .
 
 -spec pegjs_code_506_1(iolist(), index()) -> parse_result().
 pegjs_code_506_1(Node, _Idx) ->
 
-    [_, {_, [Digits0]}] = Node,
-    Digits = lists:foldl( fun([D], Acc) -> <<Acc/binary, D/binary>> end
-                        , <<>>, Digits0),
+    [_, {_, Digits0}] = Node,
+    Digits = lists:foldl( fun(D, Acc) -> <<Acc/binary, D/binary>> end
+                        , <<>>, lists:flatten(Digits0)),
     <<"\\x{", Digits/binary, "}">>
   .
 

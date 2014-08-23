@@ -17,13 +17,11 @@ This is a rather straightforward port/implementation of the grammar defined for
   of the grammar has been ported to `priv/parser.pegjs`, but causes the VM to quit
   with an out-of-memory exception on sufficiently large garmmars (including its own).
   See *How to contribute* section for more info
+- Implements support for `@append` extension (see, e.g. [core-pegjs](https://github.com/for-GET/core-pegjs) 
+  in the for-GET project)
 
 ## Further work
 
-- Support @append (see, e.g. [core-pegjs](https://github.com/for-GET/core-pegjs) 
-  in the for-GET project)
-- Add more options:
-  - set root for multiple grammars (when @append is implemented)
 - Dialyze, create dialyzer-friendly parsers
 
 ## How to use

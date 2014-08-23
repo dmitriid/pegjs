@@ -20,7 +20,8 @@
                  | {ignore_duplicates, boolean()}    %% ignore duplicate rules. Default: false
                  | {ignore_unparsed, boolean()}      %% ignore incomplete parses. Default: false
                  | {ignore_missing_rules, boolean()} %% Default: false
-                 | {parser, atom()}               %% use a different module to parse grammars. Default: pegjs_parse
+                 | {ignore_invalid_code, boolean()}  %% Default: false
+                 | {parser, atom()}                  %% use a different module to parse grammars. Default: pegjs_parse
                  | {root, Dir::string() | binary()}. %% root directory for @append instructions. Default: undefined
 -type options() :: [option()].
 
@@ -260,25 +261,31 @@ verify_initializer(#analysis{ initializer = _Initializer
   Analysis.
 
 -spec verify_code(#analysis{}) -> #analysis{}.
-verify_code(#analysis{ code   = Code0
-                     , errors = Errors0
+verify_code(#analysis{ code    = Code0
+                     , errors  = Errors0
+                     , options = Options
                      } = Analysis) ->
-  {CodeErrors, Code} = verify_code(Code0, [], orddict:new()),
+  {CodeErrors, Code} = verify_code(Code0, [], orddict:new(), Options),
   Errors = case CodeErrors of
              [] -> Errors0;
              _ -> ordsets:add_element({invalid_code, CodeErrors}, Errors0)
            end,
   Analysis#analysis{code = Code, errors = Errors}.
 
--spec verify_code(list(), list(), list()) -> {list(), list()}.
-verify_code([], Errors, Accum) ->
+-spec verify_code(list(), list(), list(), list()) -> {list(), list()}.
+verify_code([], Errors, Accum, _Options) ->
   {Errors, Accum};
-verify_code([{Index, Code} | T], Errors, Accum) ->
+verify_code([{Index, Code} | T], Errors, Accum, Options) ->
   case verify_code_block(Code) of
     {error, Reason} ->
-      verify_code(T, [{Reason, Index} | Errors], Accum);
+      case proplists:get_value(ignore_invalid_code, Options, false) of
+        true ->
+          verify_code(T, Errors, orddict:store(Index, {Code, []}, Accum), Options);
+        false ->
+          verify_code(T, [{Reason, Index} | Errors], Accum, Options)
+      end;
     {ok, Vars} ->
-      verify_code(T, Errors, orddict:store(Index, {Code, Vars}, Accum))
+      verify_code(T, Errors, orddict:store(Index, {Code, Vars}, Accum), Options)
   end.
 
 -spec verify_code_block(binary()) -> {ok, list()} | {error, term()}.
@@ -323,6 +330,7 @@ fill_options(UserOptions) ->
   Options = [ {ignore_unused, true}
             , {ignore_duplicates, false}
             , {ignore_missing_rules, false}
+            , {ignore_invalid_code, false}
             , {root, undefined}],
 
   lists:map( fun({Key, Val}) ->

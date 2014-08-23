@@ -546,12 +546,12 @@ eol
   = "\n"
   / "\r\n"
   / "\r"
-  / [\x2028]
-  / [\x2029]
+  / [\u2028]
+  / [\u2029]
 
 eolChar
-  = [\n\r\x2028\x2029]
+  = [\n\r\u2028\u2029]
 
 /* Modeled after ECMA-262, 5th ed., 7.2. */
 whitespace
-  = [ \t\v\f\x00A0\xFEFF\x1680\x180E\x2000-\x200A\x202F\x205F\x3000]
+  = [ \t\v\f\u00A0\uFEFF\u1680\u180E\u2000-\u200A\u202F\u205F\u3000]

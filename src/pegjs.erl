@@ -86,7 +86,7 @@ generate(Input) ->
 -spec generate_module_attributes(#input{}) -> {ok, #input{}} | {error, term()}.
 generate_module_attributes(#input{ module_name = ModuleName
                                  , output_file = OutputFile} = Input) ->
-  file:write(OutputFile, ["-module(", atom_to_list(ModuleName), ")."
+  file:write(OutputFile, ["-module('", atom_to_list(ModuleName), "')."
                          , "\n"
                          , "-export([ parse/1"
                          , "\n"

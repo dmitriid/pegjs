@@ -40,12 +40,18 @@ file(FileName, Options0) ->
                 [{root, Root} | Options0];
               _       -> Options0
             end,
+  { AppendedGrammar
+  , AppendedAnalysis } =  analyze_appended_files(FileName, Options),
   Parser = proplists:get_value(parser, Options, pegjs_parse),
   case Parser:file(FileName) of
-    #grammar{} = G -> analyze(G, Options);
+    #grammar{} = G -> analyze( merge_grammar(G, AppendedGrammar)
+                             , Options
+                             , AppendedAnalysis);
     {#grammar{} = G, Unparsed, Index} ->
       case proplists:get_value(ignore_unparsed, Options, false) of
-        true -> analyze(G, Options);
+        true -> analyze( merge_grammar(G, AppendedGrammar)
+                       , Options
+                       , AppendedAnalysis);
         false -> {error, {could_not_parse, Unparsed, Index}}
       end;
     E              -> E
@@ -56,10 +62,14 @@ analyze(Grammar) ->
   analyze(Grammar, []).
 
 -spec analyze(#grammar{}, options()) -> {#grammar{}, #analysis{}}.
-analyze(#grammar{} = Grammar, Options0) ->
+analyze(#grammar{} = Grammar, Options) ->
+  analyze(Grammar, Options, #analysis{options = Options}).
+
+-spec analyze(#grammar{}, options(), #analysis{}) -> {#grammar{}, #analysis{}}.
+analyze(#grammar{} = Grammar, Options0, Analysis0) ->
   Options = fill_options(Options0),
-  Analysis0 = perform_analysis(Grammar, #analysis{options = Options}),
-  Analysis = #analysis{errors = Errors} = verify(Analysis0),
+  Analysis1 = perform_analysis(Grammar, Analysis0#analysis{options = Options}),
+  Analysis = #analysis{errors = Errors} = verify(Analysis1),
   case Errors of
     []   -> {Grammar, Analysis};
     List -> {error, List}
@@ -67,6 +77,36 @@ analyze(#grammar{} = Grammar, Options0) ->
 
 
 %%_* Internal ==================================================================
+
+-spec analyze_appended_files(string(), proplists:proplist()) -> [#grammar{}].
+analyze_appended_files(File, Options0) ->
+  Appends = pegjs_append:file(File),
+  Root    = proplists:get_value(root, Options0),
+  Parser  = proplists:get_value(parser, Options0, pegjs_parse),
+  IgnoreUnparsed  = proplists:get_value(ignore_unparsed, Options0, false),
+  Options = fill_options([ {root, Root}
+                         , {parser, Parser}
+                         , {ignore_unparsed, IgnoreUnparsed}
+                         ]),
+  F = fun(AppendFile, {Grammar, Analysis}) ->
+        Path = filename:join([Root, AppendFile]),
+        case filelib:is_file(Path) of
+          true ->
+            case ?MODULE:file(Path, Options) of
+              {error, _} = E ->
+                Errs = ordsets:add_element(E, Analysis#analysis.errors),
+                {Grammar, Analysis#analysis{errors = Errs}};
+              {G, _A} -> { merge_grammar(G, Grammar)
+                         , Analysis }
+            end;
+          false ->
+            E = {error, {not_found, Path}},
+            Errs = ordsets:add_element(E, Analysis#analysis.errors),
+            {Grammar, Analysis#analysis{errors = Errs}}
+        end
+      end,
+  lists:foldl(F, {#grammar{}, #analysis{}}, Appends).
+
 -spec perform_analysis(list(), #analysis{}) -> #analysis{}.
 perform_analysis([], #analysis{} = A) ->
   A;
@@ -337,3 +377,15 @@ fill_options(UserOptions) ->
                {Key, proplists:get_value(Key, UserOptions, Val)}
              end
            , Options).
+
+-spec merge_grammar(#grammar{}, #grammar{}) -> #grammar{}.
+merge_grammar( #grammar{ initializer = #code{ code = Initializer1
+                                            , index = Index }
+                       , rules       = Rules1 }
+             , #grammar{ initializer = #code{code = Initializer2}
+                       , rules       = Rules2 }) ->
+  Initializer = <<Initializer1/binary, Initializer2/binary>>,
+  #grammar{ initializer = #code{ code = Initializer
+                               , index = Index}
+          , rules       = Rules1 ++ Rules2
+          }.

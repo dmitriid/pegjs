@@ -89,7 +89,11 @@ grammar
   = __ initializer:initializer? rules:rule+
   {
     [_, {_, Initializer}, {_, Rules}] = Node,
-    #grammar{ initializer = Initializer
+    I = case Initializer of
+          [] -> #code{};
+          _  -> #code{ code = Initializer, index = Idx }
+        end,
+    #grammar{ initializer = I
             , rules       = Rules
             , index       = Idx
             }
@@ -99,9 +103,7 @@ initializer
   = code:action semicolon?
   {
     [{_, Code}, _] = Node,
-    #code{ code  = Code
-         , index = Idx
-         }
+    Code
   }
 
 rule

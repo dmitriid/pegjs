@@ -4,8 +4,8 @@
                  , index :: index()
                  }).
 
--record(code, { code :: unicode:chardata()
-              , index :: index()
+-record(code, { code  = <<>> :: unicode:chardata()
+              , index        :: index()
               }).
 
 -record(regexp, { parts       :: term()
@@ -77,9 +77,9 @@
               , index        :: index()
               }).
 
--record(grammar, { initializer :: #code{}
-                 , rules       :: [#rule{}]
-                 , index       :: index()
+-record(grammar, { initializer = #code{} :: #code{}
+                 , rules       = []      :: [#rule{}]
+                 , index                 :: index()
                  }).
 
 -ifndef(index).

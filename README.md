@@ -56,11 +56,15 @@ There are several options you can pass along to `pegjs:file(File, Options::optio
 
 %% options for pegjs_analyze
 
--type option()  :: {ignore_unused, boolean()}         %% ignore unused rules. Default: true
-                 | {ignore_duplicates, boolean()}     %% ignore duplicate rules. Default: false
-                 | {ignore_unparsed, boolean()}       %% ignore incomplete parses. Default: false
-                 | {ignore_missing_rules, boolean()}, %% Default: false
-                 | {parser, atom()}.                  %% use a different module to parse grammars. Default: pegjs_parse
+-type option()  :: {ignore_unused, boolean()}        %% ignore unused rules. Default: true
+                 | {ignore_duplicates, boolean()}    %% ignore duplicate rules. Default: false
+                 | {ignore_unparsed, boolean()}      %% ignore incomplete parses. Default: false
+                 | {ignore_missing_rules, boolean()} %% Default: false
+                 | {ignore_invalid_code, boolean()}  %% Default: false
+                 | {parser, atom()}                  %% use a different module to parse grammars. 
+                                                     %% Default: pegjs_parse
+                 | {root, Dir::string() | binary()}. %% root directory for @append instructions. 
+                                                     %% Default: undefined
 
 ```
 

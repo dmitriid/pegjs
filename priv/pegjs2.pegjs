@@ -73,10 +73,23 @@
 //}
 
 {
-hex(N) when N < 10 ->
-    $0+N;
-hex(N) when N >= 10, N < 16 ->
-    $a+(N-10).
+
+-record(entry, { type :: binary()
+               , name :: binary()
+               , display_name :: binary()
+               , label :: binary()
+               , rules :: list()
+               , expression :: list()
+               , alternatives :: list()
+               , elements :: list()
+               , code :: iolist()
+               , parts :: iolist()
+               , inverted :: boolean()
+               , ignore_case :: boolean()
+               , raw_text :: iolist() | binary()
+               , value :: binary()
+               , initializer :: tuple()
+               }).
 
 int(C) when $0 =< C, C =< $9 ->
     C - $0;
@@ -85,17 +98,6 @@ int(C) when $A =< C, C =< $F ->
 int(C) when $a =< C, C =< $f ->
     C - $a + 10.
 
-to_hex(N) when N < 256 ->
-    [hex(N div 16), hex(N rem 16)].
-
-list_to_hexstr([]) ->
-    [];
-list_to_hexstr([H|T]) ->
-    to_hex(H) ++ list_to_hexstr(T).
-
-bin_to_hexstr(Bin) ->
-    list_to_hexstr(binary_to_list(Bin)).
-
 hexstr_to_bin(S) ->
     unicode:characters_to_binary(hexstr_to_list(S)).
 
@@ -103,75 +105,140 @@ hexstr_to_list([X,Y|T]) ->
     [int(X)*16 + int(Y) | hexstr_to_list(T)];
 hexstr_to_list([]) ->
     [].
+
+filter_empty_strings(Strings) ->
+  filter_empty_strings(Strings, []).
+
+filter_empty_strings([], Acc) ->
+  lists:reverse(Acc);
+filter_empty_strings([H|T], Acc) ->
+  filter_empty_strings(T, [filter_empty_strings(H) | Acc]);
+filter_empty_strings(<<>>, Acc) ->
+  lists:reverse(Acc);
+filter_empty_strings(Binary, _) when is_binary(Binary) ->
+  Binary.
+
+text(Node) ->
+  TextNode = [T || Match <- Node
+                 , T <- case Match of {_, Part} -> [Part]; Part -> [Part] end
+             ],
+  iolist_to_binary(TextNode).
+
+entries(#entry{} = E) ->
+  E;
+entries(List) ->
+  [E || E = #entry{} <- lists:flatten(List)].
+
+ops_to_prefixed_types([H|_])   -> ops_to_prefixed_types(H);
+ops_to_prefixed_types(<<"$">>) -> <<"text">>;
+ops_to_prefixed_types(<<"&">>) -> <<"simple_and">>;
+ops_to_prefixed_types(<<"!">>) -> <<"simple_not">>.
+
+ops_to_suffixed_types([H|_])   -> ops_to_suffixed_types(H);
+ops_to_suffixed_types(<<"?">>) -> <<"optional">>;
+ops_to_suffixed_types(<<"*">>) -> <<"zero_or_more">>;
+ops_to_suffixed_types(<<"+">>) -> <<"one_or_more">>.
+
+ops_to_semantic_predicate_types([H|_])   -> ops_to_semantic_predicate_types(H);
+ops_to_semantic_predicate_types(<<"&">>) -> <<"semantic_and">>;
+ops_to_semantic_predicate_types(<<"!">>) -> <<"semantic_not">>.
 }
 
 /* ---- Syntactic Grammar ----- */
 
 Grammar
-  = __ initializer:(Initializer __)? rules:(Rule __)+ /*{
-      return {
-        type:        "grammar",
-        initializer: extractOptional(initializer, 0),
-        rules:       extractList(rules, 0)
-      };
-    }*/
+  = __ initializer:(Initializer __)? rules:(Rule __)+ {
+      [_, {_, Initializer}, {_, Rules}] = Node,
+      #entry{ type        = <<"grammar">>
+            , initializer = case Initializer of [I, _] -> I; [] -> [] end
+            , rules       = entries(Rules)
+            }
+    }
 
 Initializer
-  = code:CodeBlock EOS { [{_, Code}, _] = Node, [{type, <<"initializer">>}, {code, Code}] }
+  = code:CodeBlock EOS { [{_, Code}, _] = Node, #entry{type = <<"initializer">>, code = Code} }
 
 Rule
   = name:IdentifierName __
     displayName:(StringLiteral __)?
     "=" __
     expression:Expression EOS
-    /*{
-      return {
-        type:        "rule",
-        name:        name,
-        expression:  displayName !== null
-          ? {
-              type:       "named",
-              name:       displayName[0],
-              expression: expression
+    {
+      [{_, Name}, _, {_, DisplayName}, _, _, {_, Expression}, _] = Node,
+      #entry{ type = <<"rule">>
+            , name = Name
+            , expression = case DisplayName of
+                              [String, _] ->
+                                #entry{ type       = <<"named">>
+                                      , name       = String
+                                      , expression = entries(Expression)
+                                      };
+                              [] ->
+                                entries(Expression)
+                           end
             }
-          : expression
-      };
-    }*/
+    }
 
 Expression
   = ChoiceExpression
 
 ChoiceExpression
-  = first:ActionExpression rest:(__ "/" __ ActionExpression)* /*{
-      return rest.length > 0
-        ? { type: "choice", alternatives: buildList(first, rest, 3) }
-        : first;
-    }*/
+  = first:ActionExpression rest:(__ "/" __ ActionExpression)* {
+      [{_, First}, {_, Rest}] = Node,
+      case Rest of
+        [] ->
+          entries(First);
+        _ ->
+          #entry{ type         = <<"choice">>
+                , alternatives = entries([First | Rest])
+                }
+      end
+    }
 
 ActionExpression
-  = expression:SequenceExpression code:(__ CodeBlock)?/* {
-      return code !== null
-        ? { type: "action", expression: expression, code: code[1] }
-        : expression;
-    }*/
+  = expression:SequenceExpression code:(__ CodeBlock)? {
+      [{_, Expression}, {_, Code}] = Node,
+      case Code of
+        [] ->
+          entries(Expression);
+        [_, C]  ->
+          #entry{ type       = <<"action">>
+                , expression = entries(Expression)
+                , code       = C
+                }
+      end
+    }
 
 SequenceExpression
-  = first:LabeledExpression rest:(__ LabeledExpression)* /*{
-      return rest.length > 0
-        ? { type: "sequence", elements: buildList(first, rest, 1) }
-        : first;
-    }*/
+  = first:LabeledExpression rest:(__ LabeledExpression)* {
+      [{_, First}, {_, Rest}] = Node,
+      case Rest of
+        [] ->
+          entries(First);
+        _ ->
+          #entry{ type     = <<"sequence">>
+                , elements = entries([First | Rest])
+                }
+      end
+    }
 
 LabeledExpression
-  = label:Identifier __ ":" __ expression:PrefixedExpression /*{
-      return { type: "labeled", label: label, expression: expression };
-    }*/
+  = label:Identifier __ ":" __ expression:PrefixedExpression {
+      [{_, Label}, _, _, _, {_, Expression}] = Node,
+      #entry{ type       = <<"labeled">>
+            , label      = Label
+            , expression = entries(Expression)
+            }
+    }
   / PrefixedExpression
 
 PrefixedExpression
-  = operator:PrefixedOperator __ expression:SuffixedExpression /*{
-      return { type: OPS_TO_PREFIXED_TYPES[operator], expression: expression };
-    }*/
+  = operator:PrefixedOperator __ expression:SuffixedExpression {
+      [{_, Operator}, _, {_, Expression}] = Node,
+      #entry{ type       = ops_to_prefixed_types(Operator)
+            , expression = entries(Expression)
+            }
+    }
   / SuffixedExpression
 
 PrefixedOperator
@@ -180,9 +247,12 @@ PrefixedOperator
   / "!"
 
 SuffixedExpression
-  = expression:PrimaryExpression __ operator:SuffixedOperator/* {
-      return { type: OPS_TO_SUFFIXED_TYPES[operator], expression: expression };
-    }*/
+  = expression:PrimaryExpression __ operator:SuffixedOperator {
+      [{_, Expression}, _, {_, Operator}] = Node,
+      #entry{ type       = ops_to_suffixed_types(Operator)
+            , expression = entries(Expression)
+            }
+    }
   / PrimaryExpression
 
 SuffixedOperator
@@ -199,14 +269,20 @@ PrimaryExpression
   / "(" __ expression:Expression __ ")" { [_, _, {_, Expression}, _, _] = Node, Expression }
 
 RuleReferenceExpression
-  = name:IdentifierName !(__ (StringLiteral __)? "=") /*{
-      return { type: "rule_ref", name: name };
-    }*/
+  = name:IdentifierName !(__ (StringLiteral __)? "=") {
+      [{_, Name}, _] = Node,
+      #entry{ type = <<"rule_ref">>
+            , name = Name
+            }
+    }
 
 SemanticPredicateExpression
-  = operator:SemanticPredicateOperator __ code:CodeBlock/* {
-      return { type: OPS_TO_SEMANTIC_PREDICATE_TYPES[operator], code: code };
-    }*/
+  = operator:SemanticPredicateOperator __ code:CodeBlock {
+      [{_, Operator}, _, {_, Code}] = Node,
+      #entry{ type = ops_to_semantic_predicate_types(Operator)
+            , code = Code
+            }
+    }
 
 SemanticPredicateOperator
   = "&"
@@ -340,10 +416,10 @@ BooleanLiteral
 LiteralMatcher "literal"
   = value:StringLiteral ignoreCase:"i"? {
       [{_, Value}, {_, IgnoreCase}] = Node,
-      [ {type, <<"literal">>}
-      , {value, Value}
-      , {ignoreCase, IgnoreCase /= []}
-      ]
+      #entry{ type        = <<"literal">>
+            , value       = Value
+            , ignore_case = IgnoreCase /= []
+            }
     }
 
 StringLiteral "string"
@@ -351,12 +427,12 @@ StringLiteral "string"
   / "'" chars:SingleStringCharacter* "'" { [_, {_, Chars}, _] = Node, iolist_to_binary(Chars) }
 
 DoubleStringCharacter
-  = !('"' / "\\" / LineTerminator) SourceCharacter { iolist_to_binary(Node) }
+  = !('"' / "\\" / LineTerminator) SourceCharacter { text(Node) }
   / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, Sequence }
   / LineContinuation
 
 SingleStringCharacter
-  = !("'" / "\\" / LineTerminator) SourceCharacter { iolist_to_binary(Node) }
+  = !("'" / "\\" / LineTerminator) SourceCharacter { text(Node) }
   / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, Sequence }
   / LineContinuation
 
@@ -366,15 +442,16 @@ CharacterClassMatcher "character class"
     parts:(ClassCharacterRange / ClassCharacter)*
     "]"
     ignoreCase:"i"?
-    /*{
-      return {
-        type:       "class",
-        parts:      filterEmptyStrings(parts),
-        inverted:   inverted !== null,
-        ignoreCase: ignoreCase !== null,
-        rawText:    text()
-      };
-    }*/
+    {
+      [_, {_, Inverted}, {_, Parts0}, _, {_, IgnoreCase}] = Node,
+      Parts = filter_empty_strings(Parts0),
+      #entry{ type        = <<"class">>
+            , parts       = Parts
+            , inverted    = Inverted /= []
+            , ignore_case = IgnoreCase /= []
+            , raw_text    = text(Node)
+            }
+    }
 
 ClassCharacterRange
   = begin:ClassCharacter "-" end:ClassCharacter {
@@ -388,9 +465,9 @@ ClassCharacterRange
     }
 
 ClassCharacter
-  = !("]" / "\\" / LineTerminator) SourceCharacter { iolist_to_binary(Node) }
+  = !("]" / "\\" / LineTerminator) SourceCharacter { text(Node) }
   / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, iolist_to_binary(Sequence) }
-  / LineContinuation { iolist_to_binary(Node) }
+  / LineContinuation { text(Node) }
 
 LineContinuation
   = "\\" LineTerminatorSequence { <<"">> }
@@ -417,7 +494,7 @@ SingleEscapeCharacter
   / "v"  { <<"\v">>   }
 
 NonEscapeCharacter
-  = !(EscapeCharacter / LineTerminator) SourceCharacter { iolist_to_binary(Node) }
+  = !(EscapeCharacter / LineTerminator) SourceCharacter { text(Node) }
 
 EscapeCharacter
   = SingleEscapeCharacter
@@ -447,7 +524,7 @@ AnyMatcher
   = "." { [{type, <<"any">> }] }
 
 CodeBlock "code block"
-  = "{" code:Code "}" { [_, Code, _] = Node, Code }
+  = "{" code:Code "}" { [_, {_, Code}, _] = Node, Code }
 
 Code
   = $((![{}] SourceCharacter)+ / "{" Code "}")*

@@ -1,95 +1,31 @@
-///*
-// * PEG.js Grammar
-// * ==============
-// *
-// * PEG.js grammar syntax is designed to be simple, expressive, and similar to
-// * JavaScript where possible. This means that many rules, especially in the
-// * lexical part, are based on the grammar from ECMA-262, 5.1 Edition [1]. Some
-// * are directly taken or adapted from the JavaScript example grammar (see
-// * examples/javascript.pegjs).
-// *
-// * Limitations:
-// *
-// *   * Non-BMP characters are completely ignored to avoid surrogate pair
-// *     handling.
-// *
-// *   * One can create identifiers containing illegal characters using Unicode
-// *     escape sequences. For example, "abcd\u0020efgh" is not a valid
-// *     identifier, but it is accepted by the parser.
-// *
-// * Both limitations could be resolved, but the costs would likely outweigh
-// * the benefits.
-// *
-// * [1] http://www.ecma-international.org/publications/standards/Ecma-262.htm
-// */
-//
-//{
-//  var OPS_TO_PREFIXED_TYPES = {
-//    "$": "text",
-//    "&": "simple_and",
-//    "!": "simple_not"
-//  };
-//
-//  var OPS_TO_SUFFIXED_TYPES = {
-//    "?": "optional",
-//    "*": "zero_or_more",
-//    "+": "one_or_more"
-//  };
-//
-//  var OPS_TO_SEMANTIC_PREDICATE_TYPES = {
-//    "&": "semantic_and",
-//    "!": "semantic_not"
-//  };
-//
-//  function filterEmptyStrings(array) {
-//    var result = [], i;
-//
-//    for (i = 0; i < array.length; i++) {
-//      if (array[i] !== "") {
-//        result.push(array[i]);
-//      }
-//    }
-//
-//    return result;
-//  }
-//
-//  function extractOptional(optional, index) {
-//    return optional ? optional[index] : null;
-//  }
-//
-//  function extractList(list, index) {
-//    var result = new Array(list.length), i;
-//
-//    for (i = 0; i < list.length; i++) {
-//      result[i] = list[i][index];
-//    }
-//
-//    return result;
-//  }
-//
-//  function buildList(first, rest, index) {
-//    return [first].concat(extractList(rest, index));
-//  }
-//}
+/*
+* PEG.js Grammar
+* ==============
+*
+* PEG.js grammar syntax is designed to be simple, expressive, and similar to
+* JavaScript where possible. This means that many rules, especially in the
+* lexical part, are based on the grammar from ECMA-262, 5.1 Edition [1]. Some
+* are directly taken or adapted from the JavaScript example grammar (see
+* examples/javascript.pegjs).
+*
+* Limitations:
+*
+*   * Non-BMP characters are completely ignored to avoid surrogate pair
+*     handling.
+*
+*   * One can create identifiers containing illegal characters using Unicode
+*     escape sequences. For example, "abcd\u0020efgh" is not a valid
+*     identifier, but it is accepted by the parser.
+*
+* Both limitations could be resolved, but the costs would likely outweigh
+* the benefits.
+*
+* [1] http://www.ecma-international.org/publications/standards/Ecma-262.htm
+*/
 
 {
 
--record(entry, { type :: binary()
-               , name :: binary()
-               , display_name :: binary()
-               , label :: binary()
-               , rules :: list()
-               , expression :: list()
-               , alternatives :: list()
-               , elements :: list()
-               , code :: iolist()
-               , parts :: iolist()
-               , inverted :: boolean()
-               , ignore_case :: boolean()
-               , raw_text :: iolist() | binary()
-               , value :: binary()
-               , initializer :: tuple()
-               }).
+-include("pegjs2.hrl").
 
 int(C) when $0 =< C, C =< $9 ->
     C - $0;
@@ -152,11 +88,12 @@ Grammar
       #entry{ type        = <<"grammar">>
             , initializer = case Initializer of [I, _] -> I; [] -> [] end
             , rules       = entries(Rules)
+            , index       = Idx
             }
     }
 
 Initializer
-  = code:CodeBlock EOS { [{_, Code}, _] = Node, #entry{type = <<"initializer">>, code = Code} }
+  = code:CodeBlock EOS { [{_, Code}, _] = Node, #entry{type = <<"initializer">>, code = Code, index = Idx} }
 
 Rule
   = name:IdentifierName __
@@ -172,10 +109,12 @@ Rule
                                 #entry{ type       = <<"named">>
                                       , name       = String
                                       , expression = entries(Expression)
+                                      , index       = Idx
                                       };
                               [] ->
                                 entries(Expression)
                            end
+            , index = Idx
             }
     }
 
@@ -191,6 +130,7 @@ ChoiceExpression
         _ ->
           #entry{ type         = <<"choice">>
                 , alternatives = entries([First | Rest])
+                , index       = Idx
                 }
       end
     }
@@ -205,6 +145,7 @@ ActionExpression
           #entry{ type       = <<"action">>
                 , expression = entries(Expression)
                 , code       = C
+                , index       = Idx
                 }
       end
     }
@@ -218,6 +159,7 @@ SequenceExpression
         _ ->
           #entry{ type     = <<"sequence">>
                 , elements = entries([First | Rest])
+                , index       = Idx
                 }
       end
     }
@@ -228,6 +170,7 @@ LabeledExpression
       #entry{ type       = <<"labeled">>
             , label      = Label
             , expression = entries(Expression)
+            , index       = Idx
             }
     }
   / PrefixedExpression
@@ -237,6 +180,7 @@ PrefixedExpression
       [{_, Operator}, _, {_, Expression}] = Node,
       #entry{ type       = ops_to_prefixed_types(Operator)
             , expression = entries(Expression)
+            , index       = Idx
             }
     }
   / SuffixedExpression
@@ -251,6 +195,7 @@ SuffixedExpression
       [{_, Expression}, _, {_, Operator}] = Node,
       #entry{ type       = ops_to_suffixed_types(Operator)
             , expression = entries(Expression)
+            , index       = Idx
             }
     }
   / PrimaryExpression
@@ -271,16 +216,18 @@ PrimaryExpression
 RuleReferenceExpression
   = name:IdentifierName !(__ (StringLiteral __)? "=") {
       [{_, Name}, _] = Node,
-      #entry{ type = <<"rule_ref">>
-            , name = Name
+      #entry{ type  = <<"rule_ref">>
+            , name  = Name
+            , index = Idx
             }
     }
 
 SemanticPredicateExpression
   = operator:SemanticPredicateOperator __ code:CodeBlock {
       [{_, Operator}, _, {_, Code}] = Node,
-      #entry{ type = ops_to_semantic_predicate_types(Operator)
-            , code = Code
+      #entry{ type  = ops_to_semantic_predicate_types(Operator)
+            , code  = Code
+            , index = Idx
             }
     }
 
@@ -419,6 +366,7 @@ LiteralMatcher "literal"
       #entry{ type        = <<"literal">>
             , value       = Value
             , ignore_case = IgnoreCase /= []
+            , index       = Idx
             }
     }
 
@@ -450,6 +398,7 @@ CharacterClassMatcher "character class"
             , inverted    = Inverted /= []
             , ignore_case = IgnoreCase /= []
             , raw_text    = text(Node)
+            , index       = Idx
             }
     }
 
@@ -521,7 +470,7 @@ HexDigit
   = [0-9a-f]i
 
 AnyMatcher
-  = "." { [{type, <<"any">> }] }
+  = "." { #entry{type = <<"any">>} }
 
 CodeBlock "code block"
   = "{" code:Code "}" { [_, {_, Code}, _] = Node, Code }

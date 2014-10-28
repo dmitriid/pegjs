@@ -3,7 +3,7 @@
 %%% @author Dmitrii Dimandt <dmitrii@dmitriid.com>
 %%%
 %%%-----------------------------------------------------------------------------
--module(pegjs_utils).
+-module(pegjs_util).
 -author("dmitrii.dimandt").
 
 %% API

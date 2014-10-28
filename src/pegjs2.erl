@@ -45,7 +45,7 @@ file(FileName, Options) ->
     {File, File} ->
       {error, input_and_output_are_the_same};
     _ ->
-      compile([ {input, FileName}
+      compile([ {input_file, FileName}
               , {output, OutputFilename}
               , {module, ModuleName}
               | Options
@@ -56,7 +56,7 @@ file(FileName, Options) ->
 %%_* Internal ==================================================================
 -spec compile(Options::proplists:proplist()) -> ok | {error, term()}.
 compile(Options) ->
-  pegjs_utils:chain([ fun pegjs2_analyze:analyze/1
+  pegjs_util:chain( [ fun pegjs2_analyze:analyze/1
                     , fun pegjs2_analyze:report_missing_rules/1
                     , fun pegjs2_analyze:report_left_recursion/1
                     , fun pegjs2_analyze:remove_proxy_rules/1

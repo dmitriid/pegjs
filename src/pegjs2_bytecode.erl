@@ -236,9 +236,9 @@ generate(#entry{ type       = <<"named">>
                , expression = Expression
                , name       = Name
                }, Context) ->
-  NameIndex = add_const([ {type, <<"other">>}
-                        , {description, Name}
-                        ]),
+  NameIndex = add_const(#entry{ type = <<"other">>
+                              , description = Name
+                              }),
   [ ?SILENT_FAILS_ON
   , generate(Expression, Context)
   , ?SILENT_FAILS_OFF
@@ -381,7 +381,9 @@ generate( #entry{ type = <<"literal">>
       StringIndex = add_const(Value),
       ExpectedStringIndex = add_const(#entry{ type        = <<"literal">>
                                             , value       = Value
-                                            , description = Value
+                                            , description = << "\\\""
+                                                             , Value/binary
+                                                             , "\\\"">>
                                             }),
       %% For case-sensitive strings the value must match the beginning of the
       %% remaining input exactly. As a result, we can use |ACCEPT_STRING| and
@@ -404,8 +406,8 @@ generate( #entry{ type = <<"class">>
                 }
         , _Context) ->
   Regexp = case {Parts, Inverted} of
-             {[], true}  -> "^[\\S\\s]";
-             {[], false} -> "^(?!)";
+             {[], true}  -> <<"^[\\S\\s]">>;
+             {[], false} -> <<"^(?!)">>;
              {_, _} ->
                Ps = lists:map(fun([B]) when is_binary(B) ->
                                   escape_for_regexp_class(B);
@@ -425,7 +427,6 @@ generate( #entry{ type = <<"class">>
   ExpectedIndex = add_const(#entry{ type        = <<"class">>
                                   , value       = RawText
                                   , description = RawText
-                                  , inverted = Inverted
                                   }),
   build_condition( [?MATCH_REGEXP, RegexpIndex]
                  , [?ACCEPT_N, 1]

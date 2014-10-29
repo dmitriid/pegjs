@@ -204,16 +204,19 @@
 
 -define(CONSTS, pegjs2_consts).
 -define(COUNTER, '__pegjs$counter__').
+-define(CONTEXT, pegjs2_context).
 
 %%_* API =======================================================================
 -spec generate(#analysis{}) -> any().
 generate(#analysis{grammar = Grammar}) ->
   ets:new(?CONSTS, [set, named_table]),
+  ets:new(?CONTEXT, [set, named_table]),
   ets:insert(?CONSTS, {?COUNTER, -1}),
   Bytecode = lists:flatten(generate(Grammar, #context{})),
   Consts = lists:sort( fun({_, I1}, {_, I2}) -> I1 < I2 end
                      , ets:tab2list(?CONSTS)),
   ets:delete(?CONSTS),
+  ets:delete(?CONTEXT),
   {Bytecode, Consts, Grammar}.
 
 
@@ -264,6 +267,7 @@ generate(#entry{ type        = <<"action">>
                  Elements == undefined;
                _ -> false
              end,
+  ets:delete_all_objects(?CONTEXT),
   ExpressionCode = generate( Expression
                            , #context{ sp = case EmitCall of
                                               true -> Sp + 1;
@@ -272,14 +276,17 @@ generate(#entry{ type        = <<"action">>
                                      , env = []
                                      , action = Entry
                                      }),
-  FunctionIndex = add_function_const([], Code),
+  Params0 = ets:tab2list(?CONTEXT),
+  Params  = lists:keysort(2, Params0),
+  ParamNames = proplists:get_keys(Params),
+  FunctionIndex = add_function_const(ParamNames, Code),
   case EmitCall of
     true ->
       [ ?PUSH_CURR_POS
       , ExpressionCode
       , build_condition( ?IF_NOT_ERROR
                        , [ [?REPORT_SAVED_POS, 1]
-                         , build_call(FunctionIndex, 1, [], Sp + 2)
+                         , build_call(FunctionIndex, 1, Params, Sp + 2)
                          ]
                        , []
                        )
@@ -295,11 +302,12 @@ generate(#entry{ type     = <<"sequence">>
   [ ?PUSH_CURR_POS
   , build_elements_code(Entry, Elements, Context#context{sp = Sp + 1})
   ];
-generate(#entry{ type     = <<"labeled">>
+generate(#entry{ type       = <<"labeled">>
+               , label      = Label
                , expression = Expression
                }
         , #context{sp = Sp}) ->
-  %% TODO: What is this?: context.env[node.label] = context.sp + 1;
+  ets:insert(?CONTEXT, {Label, Sp + 1}),
   generate(Expression, #context{sp = Sp, env = [], action = none});
 generate(#entry{ type     = <<"text">>
                , expression = Expression

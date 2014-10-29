@@ -95,59 +95,65 @@ bytecode_test_() ->
               , {function, [], [<<" code ">>]} %% TODO: 'function() { code }'
               ]
             )
-%% TODO:
-%%   , bytecode_and_consts( "for action, with one label"
-%%                        , "start = a:\"a\" { code }"
-%%                        , [
-%%                            1,                           %% PUSH_CURR_POS
-%%                            14, 0, 2, 2, 18, 0, 19, 1,   %% <expression>
-%%                            11, 7, 0,                    %% IF_NOT_ERROR
-%%                            20, 1,                       %%   * REPORT_SAVED_POS
-%%                            22, 2, 1, 1, 0,              %%     CALL
-%%                            5                            %% NIP
-%%                          ]
-%%                        , [ <<"a">>
-%%                          , #entry{ type = <<"literal">>
-%%                                  , value = <<"a">>
-%%                                  , description = <<"\\\"a\\\"">>}
-%%                          , {function, [], [<<" code ">>]} %% TODO: 'function(a) { code }'
-%%                          ]
-%%                        )
+  , run_test( "for action, with one label"
+            , "start = a:\"a\" { code }"
+            , [
+                1,                           %% PUSH_CURR_POS
+                14, 0, 2, 2, 18, 0, 19, 1,   %% <expression>
+                11, 7, 0,                    %% IF_NOT_ERROR
+                20, 1,                       %%   * REPORT_SAVED_POS
+                22, 2, 1, 1, 0,              %%     CALL
+                5                            %% NIP
+              ]
+            , [ <<"a">>
+              , #entry{ type = <<"literal">>
+                      , value = <<"a">>
+                      , description = <<"\\\"a\\\"">>}
+              , {function, [<<"a">>], [<<" code ">>]}
+              ]
+            )
 
 %% TODO
-%%   , bytecode_and_consts( "for action, with multiple labels"
-%%                        , "start = a:\"a\" b:\"b\" c:\"c\" { code }"
-%%                        , [
-%%                            1,                           %% PUSH_CURR_POS
-%%                            14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
-%%                            11, 40, 3,                   %% IF_NOT_ERROR
-%%                            14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
-%%                            11, 25, 4,                   %%     IF_NOT_ERROR
-%%                            14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
-%%                            11, 10, 4,                   %%         IF_NOT_ERROR
-%%                            20, 3,                       %%           * REPORT_SAVED_POS
-%%                            22, 6, 3, 3, 2, 1, 0,        %%             CALL
-%%                            5,                           %%             NIP
-%%                            4, 3,                        %%           * POP_N
-%%                            3,                           %%             POP_CURR_POS
-%%                            28,                          %%             PUSH_FAILED
-%%                            4, 2,                        %%       * POP_N
-%%                            3,                           %%         POP_CURR_POS
-%%                            28,                          %%         PUSH_FAILED
-%%                            2,                           %%   * POP
-%%                            3,                           %%     POP_CURR_POS
-%%                            28                           %%     PUSH_FAILED
-%%                          ]
-%%                        , [
-%%                            <<"a">>
-%%                          , #entry{type = <<"literal">>, value = <<"a">>, description = <<"\\\"a\\\"">>}
-%%                          , <<"b">>
-%%                          , #entry{type = <<"literal">>, value = <<"b">>, description = <<"\\\"b\\\"">>}
-%%                          , <<"c">>
-%%                          , #entry{type = <<"literal">>, value = <<"c">>, description = <<"\\\"c\\\"">>}
-%%                          , {function, [], [<<" code ">>]} %% TODO: 'function(a, b, c) { code }'
-%%                          ]
-%%                        )
+  , run_test( "for action, with multiple labels"
+            , "start = a:\"a\" b:\"b\" c:\"c\" { code }"
+  , []
+%%             , [
+%%                 1,                           %% PUSH_CURR_POS
+%%                 14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
+%%                 11, 40, 3,                   %% IF_NOT_ERROR
+%%                 14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
+%%                 11, 25, 4,                   %%     IF_NOT_ERROR
+%%                 14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
+%%                 11, 10, 4,                   %%         IF_NOT_ERROR
+%%                 20, 3,                       %%           * REPORT_SAVED_POS
+%%                 22, 6, 3, 3, 2, 1, 0,        %%             CALL
+%%                 5,                           %%             NIP
+%%                 4, 3,                        %%           * POP_N
+%%                 3,                           %%             POP_CURR_POS
+%%                 28,                          %%             PUSH_FAILED
+%%                 4, 2,                        %%       * POP_N
+%%                 3,                           %%         POP_CURR_POS
+%%                 28,                          %%         PUSH_FAILED
+%%                 2,                           %%   * POP
+%%                 3,                           %%     POP_CURR_POS
+%%                 28                           %%     PUSH_FAILED
+%%               ]
+            , [
+                <<"a">>
+              , #entry{ type = <<"literal">>
+                      , value = <<"a">>
+                      , description = <<"\\\"a\\\"">>}
+              , <<"b">>
+              , #entry{ type = <<"literal">>
+                      , value = <<"b">>
+                      , description = <<"\\\"b\\\"">>}
+              , <<"c">>
+              , #entry{ type = <<"literal">>
+                      , value = <<"c">>
+                      , description = <<"\\\"c\\\"">>}
+              , {function, [], [<<" code ">>]} %% TODO: 'function(a, b, c) { code }'
+              ]
+            )
   , run_test( "for sequence"
             , "start = \"a\" \"b\" \"c\""
             , [
@@ -573,8 +579,8 @@ bytecode(Description0, Grammar, ExpectedBytecode) ->
   , fun() ->
       io:format(user, "~s~n", [Description]),
       Bytecode = get_bytecode(Grammar),
-      ?whenFail( io:format(user, "Expected bytecode: ~p~n"
-                                 "Got bytecode: ~p~n", [ ExpectedBytecode
+      ?whenFail( io:format(user, "Expected bytecode:~n~p~n"
+                                 "Got bytecode:~n~p~n", [ ExpectedBytecode
                                                        , Bytecode])
                , ?assertMatch(ExpectedBytecode, Bytecode)
                )
@@ -587,13 +593,16 @@ consts(Description0, Grammar, ExpectedConsts) ->
   , fun() ->
       io:format(user, "~s~n", [Description]),
       Consts = get_consts(Grammar),
-      ?whenFail( io:format(user, "Expected consts: ~p~n"
-                                 "Got consts: ~p~n", [ ExpectedConsts
+      ?whenFail( io:format(user, "Expected consts:~n~p~n"
+                                 "Got consts:~n~p~n", [ ExpectedConsts
                                                      , Consts])
-               , lists:foldl(fun(E, [H|T]) ->
-                               ?assertMatch(E, H),
-                               T
-                             end, Consts, ExpectedConsts)
+               , begin
+                   Result = lists:foldl(fun(E, [H|T]) ->
+                                          ?assertMatch(E, H),
+                                          T
+                                        end, Consts, ExpectedConsts),
+                   ?assertMatch([], Result)
+                 end
                )
     end
   }.

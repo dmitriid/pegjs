@@ -112,32 +112,29 @@ bytecode_test_() ->
               , {function, [<<"a">>], [<<" code ">>]}
               ]
             )
-
-%% TODO
   , run_test( "for action, with multiple labels"
             , "start = a:\"a\" b:\"b\" c:\"c\" { code }"
-  , []
-%%             , [
-%%                 1,                           %% PUSH_CURR_POS
-%%                 14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
-%%                 11, 40, 3,                   %% IF_NOT_ERROR
-%%                 14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
-%%                 11, 25, 4,                   %%     IF_NOT_ERROR
-%%                 14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
-%%                 11, 10, 4,                   %%         IF_NOT_ERROR
-%%                 20, 3,                       %%           * REPORT_SAVED_POS
-%%                 22, 6, 3, 3, 2, 1, 0,        %%             CALL
-%%                 5,                           %%             NIP
-%%                 4, 3,                        %%           * POP_N
-%%                 3,                           %%             POP_CURR_POS
-%%                 28,                          %%             PUSH_FAILED
-%%                 4, 2,                        %%       * POP_N
-%%                 3,                           %%         POP_CURR_POS
-%%                 28,                          %%         PUSH_FAILED
-%%                 2,                           %%   * POP
-%%                 3,                           %%     POP_CURR_POS
-%%                 28                           %%     PUSH_FAILED
-%%               ]
+            , [
+                1,                           %% PUSH_CURR_POS
+                14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
+                11, 40, 3,                   %% IF_NOT_ERROR
+                14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
+                11, 25, 4,                   %%     IF_NOT_ERROR
+                14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
+                11, 10, 4,                   %%         IF_NOT_ERROR
+                20, 3,                       %%           * REPORT_SAVED_POS
+                22, 6, 3, 3, 2, 1, 0,        %%             CALL
+                5,                           %%             NIP
+                4, 3,                        %%           * POP_N
+                3,                           %%             POP_CURR_POS
+                28,                          %%             PUSH_FAILED
+                4, 2,                        %%       * POP_N
+                3,                           %%         POP_CURR_POS
+                28,                          %%         PUSH_FAILED
+                2,                           %%   * POP
+                3,                           %%     POP_CURR_POS
+                28                           %%     PUSH_FAILED
+              ]
             , [
                 <<"a">>
               , #entry{ type = <<"literal">>
@@ -151,7 +148,7 @@ bytecode_test_() ->
               , #entry{ type = <<"literal">>
                       , value = <<"c">>
                       , description = <<"\\\"c\\\"">>}
-              , {function, [], [<<" code ">>]} %% TODO: 'function(a, b, c) { code }'
+              , {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
               ]
             )
   , run_test( "for sequence"
@@ -188,7 +185,7 @@ bytecode_test_() ->
   , run_test( "for labeled"
             , "start = a:\"a\""
             , [
-                14, 0, 2, 2, 18, 0, 19, 1                        %%     PUSH_FAILED
+                14, 0, 2, 2, 18, 0, 19, 1    %%  PUSH_FAILED
               ]
             , []
             )
@@ -318,49 +315,49 @@ bytecode_test_() ->
               ]
             )
 %% TODO:
-%%   , run_test( "for semantic_and, with labels"
-%%             , "start = a:\"a\" b:\"b\" c:\"c\" &{ code }"
-%%             , [
-%%                     1,                           %%  PUSH_CURR_POS
-%%                     14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
-%%                     11, 55, 3,                   %%  IF_NOT_ERROR
-%%                     14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
-%%                     11, 40, 4,                   %%      IF_NOT_ERROR
-%%                     14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
-%%                     11, 25, 4,                   %%          IF_NOT_ERROR
-%%                     21,                          %%            * REPORT_CURR_POS
-%%                     22, 6, 0, 3, 2, 1, 0,        %%              CALL
-%%                     9, 2, 2,                     %%              IF
-%%                     2,                           %%                * POP
-%%                     26,                          %%                  PUSH_UNDEFINED
-%%                     2,                           %%                * POP
-%%                     28,                          %%                  PUSH_FAILED
-%%                     11, 3, 4,                    %%              IF_NOT_ERROR
-%%                     7, 4,                        %%                * WRAP
-%%                     5,                           %%                  NIP
-%%                     4, 4,                        %%                * POP_N
-%%                     3,                           %%                  POP_CURR_POS
-%%                     28,                          %%                  PUSH_FAILED
-%%                     4, 3,                        %%            * POP_N
-%%                     3,                           %%              POP_CURR_POS
-%%                     28,                          %%              PUSH_FAILED
-%%                     4, 2,                        %%        * POP_N
-%%                     3,                           %%          POP_CURR_POS
-%%                     28,                          %%          PUSH_FAILED
-%%                     2,                           %%    * POP
-%%                     3,                           %%      POP_CURR_POS
-%%                     28                           %%      PUSH_FAILED
-%%               ]
-%%             , [
-%%                 <<"a">>,
-%%                 #entry{type = <<"literal">>, value = <<"a">>, description = <<"\\\"a\\\"">>},
-%%                 <<"b">>,
-%%                 #entry{type = <<"literal">>, value = <<"b">>, description = <<"\\\"b\\\"">>},
-%%                 <<"c">>,
-%%                 #entry{type = <<"literal">>, value = <<"c">>, description = <<"\\\"c\\\"">>},
-%%                 {function, [], [<<" code ">>]} %% TODO: 'function(a, b, c) { code }'
-%%               ]
-%%             )
+  , run_test( "for semantic_and, with labels"
+            , "start = a:\"a\" b:\"b\" c:\"c\" &{ code }"
+            , [
+                    1,                           %%  PUSH_CURR_POS
+                    14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
+                    11, 55, 3,                   %%  IF_NOT_ERROR
+                    14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
+                    11, 40, 4,                   %%      IF_NOT_ERROR
+                    14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
+                    11, 25, 4,                   %%          IF_NOT_ERROR
+                    21,                          %%            * REPORT_CURR_POS
+                    22, 6, 0, 3, 2, 1, 0,        %%              CALL
+                    9, 2, 2,                     %%              IF
+                    2,                           %%                * POP
+                    26,                          %%                  PUSH_UNDEFINED
+                    2,                           %%                * POP
+                    28,                          %%                  PUSH_FAILED
+                    11, 3, 4,                    %%              IF_NOT_ERROR
+                    7, 4,                        %%                * WRAP
+                    5,                           %%                  NIP
+                    4, 4,                        %%                * POP_N
+                    3,                           %%                  POP_CURR_POS
+                    28,                          %%                  PUSH_FAILED
+                    4, 3,                        %%            * POP_N
+                    3,                           %%              POP_CURR_POS
+                    28,                          %%              PUSH_FAILED
+                    4, 2,                        %%        * POP_N
+                    3,                           %%          POP_CURR_POS
+                    28,                          %%          PUSH_FAILED
+                    2,                           %%    * POP
+                    3,                           %%      POP_CURR_POS
+                    28                           %%      PUSH_FAILED
+              ]
+            , [
+                <<"a">>,
+                #entry{type = <<"literal">>, value = <<"a">>, description = <<"\\\"a\\\"">>},
+                <<"b">>,
+                #entry{type = <<"literal">>, value = <<"b">>, description = <<"\\\"b\\\"">>},
+                <<"c">>,
+                #entry{type = <<"literal">>, value = <<"c">>, description = <<"\\\"c\\\"">>},
+                {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
+              ]
+            )
     , run_test( "for semantic_not, without labels"
               , "start = !{ code }"
               , [
@@ -377,55 +374,55 @@ bytecode_test_() ->
                 ]
               )
 %% TODO:
-%%     , run_test( "for semantic_not, with labels"
-%%               , "start = a:\"a\" b:\"b\" c:\"c\" !{ code }"
-%%               , [
-%%                     1,                           %%  PUSH_CURR_POS
-%%                     14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
-%%                     11, 55, 3,                   %%  IF_NOT_ERROR
-%%                     14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
-%%                     11, 40, 4,                   %%      IF_NOT_ERROR
-%%                     14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
-%%                     11, 25, 4,                   %%          IF_NOT_ERROR
-%%                     21,                          %%            * REPORT_CURR_POS
-%%                     22, 6, 0, 3, 2, 1, 0,        %%              CALL
-%%                     9, 2, 2,                     %%              IF
-%%                     2,                           %%                * POP
-%%                     28,                          %%                  PUSH_FAILED
-%%                     2,                           %%                * POP
-%%                     26,                          %%                  PUSH_UNDEFINED
-%%                     11, 3, 4,                    %%              IF_NOT_ERROR
-%%                     7, 4,                        %%                * WRAP
-%%                     5,                           %%                  NIP
-%%                     4, 4,                        %%                * POP_N
-%%                     3,                           %%                  POP_CURR_POS
-%%                     28,                          %%                  PUSH_FAILED
-%%                     4, 3,                        %%            * POP_N
-%%                     3,                           %%              POP_CURR_POS
-%%                     28,                          %%              PUSH_FAILED
-%%                     4, 2,                        %%        * POP_N
-%%                     3,                           %%          POP_CURR_POS
-%%                     28,                          %%          PUSH_FAILED
-%%                     2,                           %%    * POP
-%%                     3,                           %%      POP_CURR_POS
-%%                     28                           %%      PUSH_FAILED
-%%                 ]
-%%               , [
-%%                   <<"a">>,
-%%                   #entry{ type = <<"literal">>
-%%                         , value = <<"a">>
-%%                         , description = <<"\\\"a\\\"">>},
-%%                   <<"b">>,
-%%                   #entry{ type = <<"literal">>
-%%                         , value = <<"b">>
-%%                         , description = <<"\\\"b\\\"">>},
-%%                   <<"c">>,
-%%                   #entry{ type = <<"literal">>
-%%                         , value = <<"c">>
-%%                         , description = <<"\\\"c\\\"">>},
-%%                   {function, [], [<<" code ">>]} %% TODO: 'function(a, b, c) { code }'
-%%                 ]
-%%               )
+    , run_test( "for semantic_not, with labels"
+              , "start = a:\"a\" b:\"b\" c:\"c\" !{ code }"
+              , [
+                    1,                           %%  PUSH_CURR_POS
+                    14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
+                    11, 55, 3,                   %%  IF_NOT_ERROR
+                    14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
+                    11, 40, 4,                   %%      IF_NOT_ERROR
+                    14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
+                    11, 25, 4,                   %%          IF_NOT_ERROR
+                    21,                          %%            * REPORT_CURR_POS
+                    22, 6, 0, 3, 2, 1, 0,        %%              CALL
+                    9, 2, 2,                     %%              IF
+                    2,                           %%                * POP
+                    28,                          %%                  PUSH_FAILED
+                    2,                           %%                * POP
+                    26,                          %%                  PUSH_UNDEFINED
+                    11, 3, 4,                    %%              IF_NOT_ERROR
+                    7, 4,                        %%                * WRAP
+                    5,                           %%                  NIP
+                    4, 4,                        %%                * POP_N
+                    3,                           %%                  POP_CURR_POS
+                    28,                          %%                  PUSH_FAILED
+                    4, 3,                        %%            * POP_N
+                    3,                           %%              POP_CURR_POS
+                    28,                          %%              PUSH_FAILED
+                    4, 2,                        %%        * POP_N
+                    3,                           %%          POP_CURR_POS
+                    28,                          %%          PUSH_FAILED
+                    2,                           %%    * POP
+                    3,                           %%      POP_CURR_POS
+                    28                           %%      PUSH_FAILED
+                ]
+              , [
+                  <<"a">>,
+                  #entry{ type = <<"literal">>
+                        , value = <<"a">>
+                        , description = <<"\\\"a\\\"">>},
+                  <<"b">>,
+                  #entry{ type = <<"literal">>
+                        , value = <<"b">>
+                        , description = <<"\\\"b\\\"">>},
+                  <<"c">>,
+                  #entry{ type = <<"literal">>
+                        , value = <<"c">>
+                        , description = <<"\\\"c\\\"">>},
+                  {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
+                ]
+              )
 
 %% TODO:
 %%     , run_test( "for rule_ref"

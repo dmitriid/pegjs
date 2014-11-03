@@ -209,14 +209,11 @@
 %%_* API =======================================================================
 -spec generate(#analysis{}) -> any().
 generate(#analysis{grammar = Grammar}) ->
-  ets:new(?CONSTS, [set, named_table]),
-  ets:new(?CONTEXT, [set, named_table]),
-  ets:insert(?CONSTS, {?COUNTER, -1}),
+  init_global_tables(),
   Bytecode = lists:flatten(generate(Grammar, #context{})),
   Consts = lists:sort( fun({_, I1}, {_, I2}) -> I1 < I2 end
                      , ets:tab2list(?CONSTS)),
-  ets:delete(?CONSTS),
-  ets:delete(?CONTEXT),
+  teardown_global_tables(),
   {Bytecode, Consts, Grammar}.
 
 
@@ -261,13 +258,13 @@ generate(#entry{ type        = <<"action">>
                  _   -> Expression0
                end,
   EmitCall = case Expression of
-               #entry{type = <<"sequence">>} -> true;
+               #entry{type = <<"sequence">>} -> false;
                #entry{elements = Elements} ->
                  (is_list(Elements) andalso length(Elements) == 0) orelse
                  Elements == undefined;
                _ -> false
              end,
-  ets:delete_all_objects(?CONTEXT),
+  ets:update_counter(?CONTEXT, ?COUNTER, 1),
   ExpressionCode = generate( Expression
                            , #context{ sp = case EmitCall of
                                               true -> Sp + 1;
@@ -276,17 +273,14 @@ generate(#entry{ type        = <<"action">>
                                      , env = []
                                      , action = Entry
                                      }),
-  Params0 = ets:tab2list(?CONTEXT),
-  Params  = lists:keysort(2, Params0),
-  ParamNames = proplists:get_keys(Params),
-  FunctionIndex = add_function_const(ParamNames, Code),
+  FunctionIndex = add_function_const(Code),
   case EmitCall of
     true ->
       [ ?PUSH_CURR_POS
       , ExpressionCode
       , build_condition( ?IF_NOT_ERROR
                        , [ [?REPORT_SAVED_POS, 1]
-                         , build_call(FunctionIndex, 1, Params, Sp + 2)
+                         , build_call(FunctionIndex, 1, Sp + 2)
                          ]
                        , []
                        )
@@ -307,7 +301,8 @@ generate(#entry{ type       = <<"labeled">>
                , expression = Expression
                }
         , #context{sp = Sp}) ->
-  ets:insert(?CONTEXT, {Label, Sp + 1}),
+  [{_, Counter}] = ets:lookup(?CONTEXT, ?COUNTER),
+  ets:insert(?CONTEXT, {{Label, Counter}, Sp + 1}),
   generate(Expression, #context{sp = Sp, env = [], action = none});
 generate(#entry{ type     = <<"text">>
                , expression = Expression
@@ -448,11 +443,7 @@ generate(#entry{type = <<"any">>}, _Context) ->
   build_condition( ?MATCH_ANY
                  , [?ACCEPT_N, 1]
                  , [?FAIL, ExpectedIndex
-                   ]);
-generate(Entry, Context) ->
-  io:format("Entry ~p~n Context~p~n ~p~n", [Entry, Context, erlang:get_stacktrace()]),
-  error(oi).
-
+                   ]).
 
 -spec add_const(term()) -> integer().
 add_const(Value) ->
@@ -464,9 +455,22 @@ add_const(Value) ->
       I
   end.
 
--spec add_function_const(list(), term()) -> integer().
-add_function_const(Params, Code) ->
-  add_const({function, Params, Code}).
+-spec add_function_const(term()) -> integer().
+add_function_const(Code) ->
+  ParamNames = lookup_param_names(),
+  add_const({function, ParamNames, Code}).
+
+-spec lookup_param_names() -> list().
+lookup_param_names() ->
+  Params = lookup_params(),
+  [K || {K, _} <- Params].
+
+-spec lookup_params() -> list().
+lookup_params() ->
+  [{_, Counter}] = ets:lookup(?CONTEXT, ?COUNTER),
+  Matcher = [{{{'$1', Counter}, '$2'}, [], [{{'$1', '$2'}}]}],
+  Params = ets:select(?CONTEXT, Matcher),
+  lists:keysort(2, Params).
 
 -spec build_condition( CondCode::term()
                      , ThenCode::term()
@@ -494,8 +498,9 @@ build_alternatives([H|T], #context{sp = Sp} = Context) ->
     end
   ].
 
--spec build_call(integer(), integer(), list(), integer()) -> list().
-build_call(FunctionIndex, Delta, Env, Sp) ->
+-spec build_call(integer(), integer(), integer()) -> list().
+build_call(FunctionIndex, Delta, Sp) ->
+  Env = lookup_params(),
   Params = lists:map(fun(P) -> Sp - P end, [V || {_, V} <- Env]),
   [ ?CALL
   , FunctionIndex
@@ -513,13 +518,11 @@ build_elements_code( #entry{elements = Elements}
   ];
 build_elements_code( #entry{elements = Elements}
                    , []
-                   , #context{env = Env, action = Action, sp = Sp}) ->
-  FunctionIndex = add_function_const( proplists:get_keys(Env)
-                                    , Action#entry.code),
+                   , #context{action = Action, sp = Sp}) ->
+  FunctionIndex = add_function_const(Action#entry.code),
   [ [?REPORT_SAVED_POS, length(Elements)]
   , build_call( FunctionIndex
               , length(Elements)
-              , Env
               , Sp)
   , ?NIP
   ];
@@ -559,10 +562,10 @@ build_simple_predicate(Expression, Negative, #context{sp = Sp}) ->
   ].
 
 -spec build_semantic_predicate(list(), boolean(), #context{}) -> list().
-build_semantic_predicate(Code, Negative, #context{sp = Sp, env = Env}) ->
-  FunctionIndex = add_function_const(proplists:get_keys(Env), Code),
+build_semantic_predicate(Code, Negative, #context{sp = Sp}) ->
+  FunctionIndex = add_function_const(Code),
   [ ?REPORT_CURR_POS
-  , build_call(FunctionIndex, 0, Env, Sp)
+  , build_call(FunctionIndex, 0, Sp)
   , build_condition( ?IF
                    , [ ?POP
                      , case Negative of true -> ?PUSH_FAILED; false -> ?PUSH_UNDEFINED end
@@ -599,3 +602,19 @@ flatten(L) when is_list(L) ->
   lists:flatten(L);
 flatten(Any) ->
   [Any].
+
+-spec init_global_tables() -> ok.
+init_global_tables() ->
+  try ets:new(?CONSTS, [set, named_table])
+  catch _:_ -> ets:delete_all_objects(?CONSTS)
+  end,
+  try ets:new(?CONTEXT, [set, named_table])
+  catch _:_ -> ets:delete_all_objects(?CONTEXT)
+  end,
+  ets:insert(?CONSTS, {?COUNTER, -1}),
+  ets:insert(?CONTEXT, {?COUNTER, -1}).
+
+-spec teardown_global_tables() -> ok.
+teardown_global_tables() ->
+  ets:delete(?CONSTS),
+  ets:delete(?CONTEXT).

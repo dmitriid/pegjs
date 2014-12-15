@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @doc Unit tests for the bytecode generator
+%%% @doc Unit tests for removal of proxy tests
 %%%      Direct port of https://github.com/pegjs/pegjs/blob/master/spec/unit/compiler/passes/remove-proxy-rules.spec.js
 %%% @author Dmitrii Dimandt <dmitrii@dmitriid.com>
 %%%

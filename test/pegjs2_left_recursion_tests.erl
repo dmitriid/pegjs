@@ -63,7 +63,7 @@ run_test(Description, Grammar, Expected) ->
   }.
 
 get_result(Grammar) ->
-  pegjs_util:chain([fun pegjs2_analyze:analyze/1
+  pegjs_util:chain([ fun pegjs2_analyze:analyze/1
                    , fun pegjs2_analyze:report_missing_rules/1
                    , fun pegjs2_analyze:report_left_recursion/1
                    ]

@@ -594,7 +594,7 @@ consts(Description0, Grammar, ExpectedConsts) ->
       Consts = get_consts(Grammar),
       ?whenFail( io:format(user, "Expected consts:~n~p~n"
                                  "Got consts:~n~p~n", [ ExpectedConsts
-                                                     , Consts])
+                                                      , Consts])
                , begin
                    Result = lists:foldl(fun(E, [H|T]) ->
                                           ?assertMatch(E, H),

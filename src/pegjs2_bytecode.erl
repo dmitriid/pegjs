@@ -388,6 +388,7 @@ generate( #entry{ type = <<"literal">>
                                             , description = << "\\\""
                                                              , Value/binary
                                                              , "\\\"">>
+                                            , ignore_case = IgnoreCase
                                             }),
       %% For case-sensitive strings the value must match the beginning of the
       %% remaining input exactly. As a result, we can use |ACCEPT_STRING| and
@@ -406,31 +407,34 @@ generate( #entry{ type = <<"literal">>
 generate( #entry{ type = <<"class">>
                 , parts = Parts
                 , inverted = Inverted
-                , raw_text = RawText
+                , ignore_case = IgnoreCase
                 }
         , _Context) ->
-  Regexp = case {Parts, Inverted} of
-             {[], true}  -> <<"^[\\S\\s]">>;
-             {[], false} -> <<"^(?!)">>;
-             {_, _} ->
-               Ps = lists:map(fun([B]) when is_binary(B) ->
-                                  escape_for_regexp_class(B);
-                                 ([[B1, B2]]) ->
-                                  << (escape_for_regexp_class(B1))/binary
-                                   , "-"
-                                   , (escape_for_regexp_class(B2))/binary
-                                  >>
-                              end, Parts),
-               iolist_to_binary([ <<"^[">>
-                                , case Inverted of true -> <<"^">>; false -> <<>> end
-                                , Ps
-                                , <<"]">>
-                                ])
-           end,
+  Regexp =
+    case {Parts, Inverted} of
+      {[], true}  -> <<"^[\\S\\s]">>;
+      {[], false} -> <<"^(?!)">>;
+      {_, _} ->
+        Ps = lists:map(fun([B]) when is_binary(B) ->
+                            escape_for_regexp_class(B);
+                          ([[B1, B2]]) ->
+                            << (escape_for_regexp_class(B1))/binary
+                            , "-"
+                            , (escape_for_regexp_class(B2))/binary
+                            >>
+                        end, Parts),
+        iolist_to_binary([ <<"^[">>
+                         , case Inverted of true -> <<"^">>; false -> <<>> end
+                         , Ps
+                         , <<"]">>
+                         ])
+    end,
   RegexpIndex = add_const(Regexp),
   ExpectedIndex = add_const(#entry{ type        = <<"class">>
-                                  , value       = RawText
-                                  , description = RawText
+                                  , value       = Regexp
+                                  , description = Regexp
+                                  , ignore_case = IgnoreCase
+                                  , inverted    = Inverted
                                   }),
   build_condition( [?MATCH_REGEXP, RegexpIndex]
                  , [?ACCEPT_N, 1]
@@ -588,7 +592,6 @@ build_loop(CondCode, BodyCode) ->
   , BodyCode
   ].
 
-%% TODO!! FIXME!!
 -spec index_of_rule(binary()) -> integer().
 index_of_rule(Name) ->
   [{_, Result}] = ets:lookup(?RULES, Name),

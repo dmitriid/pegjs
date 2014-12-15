@@ -92,7 +92,7 @@ bytecode_test_() ->
               , #entry{ type = <<"literal">>
                       , value = <<"a">>
                       , description = <<"\\\"a\\\"">>}
-              , {function, [], [<<" code ">>]} %% TODO: 'function() { code }'
+              , {function, [], [<<" code ">>]}
               ]
             )
   , run_test( "for action, with one label"
@@ -311,10 +311,9 @@ bytecode_test_() ->
                     28             %%      PUSH_FAILED
               ]
             , [
-                {function, [], [<<" code ">>]} %% TODO: 'function() { code }'
+                {function, [], [<<" code ">>]}
               ]
             )
-%% TODO:
   , run_test( "for semantic_and, with labels"
             , "start = a:\"a\" b:\"b\" c:\"c\" &{ code }"
             , [
@@ -370,10 +369,9 @@ bytecode_test_() ->
                   26             %%      PUSH_UNDEFINED
                 ]
               , [
-                  {function, [], [<<" code ">>]} %% TODO: 'function() { code }'
+                  {function, [], [<<" code ">>]}
                 ]
               )
-%% TODO:
     , run_test( "for semantic_not, with labels"
               , "start = a:\"a\" b:\"b\" c:\"c\" !{ code }"
               , [
@@ -423,8 +421,6 @@ bytecode_test_() ->
                   {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
                 ]
               )
-
-%% TODO:
     , run_test( "for rule_ref"
               , "start = other\n"
                 "other = \"other\""
@@ -456,24 +452,25 @@ bytecode_test_() ->
                   <<"a">>,
                   #entry{ type = <<"literal">>
                         , value = <<"a">>
-                        , description = <<"\\\"a\\\"">>}
+                        , description = <<"\\\"a\\\"">>
+                        , ignore_case = false}
                 ]
               )
-%% TODO:
-%%     , run_test( "for literal, non-empty case-insensitive"
-%%               , "start = \"A\"i"
-%%               , [
-%%                     15, 0, 2, 2,   %%  MATCH_STRING_IC
-%%                     17, 1,         %%    * ACCEPT_N
-%%                     19, 1          %%    * FAIL
-%%                 ]
-%%               , [
-%%                     <<"a">>,
-%%                     #entry{ type = <<"literal">>
-%%                           , value = <<"A">>
-%%                           , description = <<"\\\"A\\\"">>}
-%%                 ]
-%%               )
+    , run_test( "for literal, non-empty case-insensitive"
+              , "start = \"A\"i"
+              , [
+                    15, 0, 2, 2,   %%  MATCH_STRING_IC
+                    17, 1,         %%    * ACCEPT_N
+                    19, 1          %%    * FAIL
+                ]
+              , [
+                    <<"A">>,
+                    #entry{ type = <<"literal">>
+                          , value = <<"A">>
+                          , description = <<"\\\"A\\\"">>
+                          , ignore_case = true}
+                ]
+              )
     , run_test( "for class"
               , "start = [a]"
               , [
@@ -489,8 +486,8 @@ bytecode_test_() ->
               , [
                   <<"^[a]">>,
                   #entry{ type = <<"class">>
-                        , value = <<"[a]">>
-                        , description = <<"[a]">>}
+                        , value = <<"^[a]">>
+                        , description = <<"^[a]">>}
                 ]
               )
     , run_test( "for class, non-empty inverted case-sensitive"
@@ -499,40 +496,41 @@ bytecode_test_() ->
               , [
                   <<"^[^a]">>,
                   #entry{ type = <<"class">>
-                        , value = <<"[^a]">>
-                        , description = <<"[^a]">>}
+                        , value = <<"^[^a]">>
+                        , description = <<"^[^a]">>
+                        , inverted = true}
                 ]
               )
-%% TODO:
-%%     , run_test( "for class, non-empty non-inverted case-insensitive"
-%%               , "start = [a]i"
-%%               , []
-%%               , [
-%%                   <<"^[a]">>,
-%%                   #entry{ type = <<"class">>
-%%                         , value = <<"[a]i">>
-%%                         , description = <<"[a]i">>}
-%%                 ]
-%%               )
-%% TODO:
-%%     , run_test( "for class, non-empty complex"
-%%               , "start = [ab-def-hij-l]"
-%%               , []
-%%               , [
-%%                   <<"^[ab-def-hij-l]">>,
-%%                   #entry{ type = <<"class">>
-%%                         , value = <<"[ab-def-hij-l]">>
-%%                         , description = <<"[ab-def-hij-l]">>}
-%%                 ]
-%%               )
+    , run_test( "for class, non-empty non-inverted case-insensitive"
+              , "start = [a]i"
+              , []
+              , [
+                  <<"^[a]">>,
+                  #entry{ type = <<"class">>
+                        , value = <<"^[a]">>
+                        , description = <<"^[a]">>
+                        , ignore_case = true
+                        }
+                ]
+              )
+    , run_test( "for class, non-empty complex"
+              , "start = [ab-def-hij-l]"
+              , []
+              , [
+                  <<"^[ab-def-hij-l]">>,
+                  #entry{ type = <<"class">>
+                        , value = <<"^[ab-def-hij-l]">>
+                        , description = <<"^[ab-def-hij-l]">>}
+                ]
+              )
     , run_test( "for class, empty non-inverted"
               , "start = []"
               , []
               , [
                   <<"^(?!)">>,
                   #entry{ type = <<"class">>
-                        , value = <<"[]">>
-                        , description = <<"[]">>}
+                        , value = <<"^(?!)">>
+                        , description = <<"^(?!)">>}
                 ]
               )
     , run_test( "for class, empty inverted"
@@ -541,8 +539,9 @@ bytecode_test_() ->
               , [
                  <<"^[\\S\\s]">>,
                   #entry{ type = <<"class">>
-                        , value = <<"[^]">>
-                        , description = <<"[^]">>}
+                        , value = <<"^[\\S\\s]">>
+                        , description = <<"^[\\S\\s]">>
+                        , inverted = true}
                 ]
               )
     , run_test( "for any"

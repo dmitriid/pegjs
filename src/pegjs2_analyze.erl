@@ -36,7 +36,7 @@
 analyze(Options0) ->
   {Fun, Input, Options} = case proplists:get_value(input, Options0) of
                             undefined ->
-                              File = proplists:get_value(root, Options0),
+                              File = proplists:get_value(input_file, Options0),
                               case proplists:get_value(root, Options0) of
                                 undefined ->
                                   Root = filename:dirname(File),
@@ -46,7 +46,6 @@ analyze(Options0) ->
                             I ->
                               {parse, I, Options0}
                           end,
-
   Parser = proplists:get_value(parser, Options, pegjs2_parse),
   case Parser:Fun(Input) of
     #entry{} = G -> analyze(G, Options);
@@ -205,8 +204,73 @@ check_left_recursion(_, _, AppliedRules) ->
   {ok, AppliedRules}.
 
 
-
+%%
+%% @doc Removes proxy rules -- that is, rules that only delegate to other rule.
+%%
 -spec remove_proxy_rules(#analysis{}) -> any().
-remove_proxy_rules(#analysis{combinators = _Combinators} = Analysis) ->
-  %% TODO!!
-  Analysis.
+remove_proxy_rules(#analysis{ combinators    = Combinators
+                            , grammar        = #entry{rules = [H | Rules0]}
+                                             = Grammar0
+                            , required_rules = RequiredRules
+                            , unique_rules   = UniqueRules
+                            } = Analysis) ->
+  ProxyRules = detect_proxy_rules(Grammar0),
+
+  RemoveRules = [From || {From, _} <- ProxyRules, From /= H#entry.name],
+
+  Rules = [R || R <- Rules0, not lists:member(R#entry.name, RemoveRules)],
+  Grammar = Grammar0#entry{rules = [H | Rules]},
+  Analysis#analysis{ combinators    = erase_from_dict(RemoveRules, Combinators)
+                   , grammar        = replace_proxy_rules(ProxyRules, Grammar)
+                   , required_rules = erase_from_dict(RemoveRules, RequiredRules)
+                   , unique_rules   = erase_from_dict(RemoveRules, UniqueRules)
+                   }.
+
+-spec erase_from_dict(list(), dict:dict()) -> dict:dict().
+erase_from_dict(List, Dict) ->
+  lists:foldl(fun(E, D) -> dict:erase(E, D) end, Dict, List).
+
+-spec detect_proxy_rules(#entry{}) -> list().
+detect_proxy_rules(#entry{ type = <<"grammar">>
+                         , rules = Rules
+                         }) ->
+  lists:foldl(fun detect_proxy_rule/2, [], Rules).
+
+-spec detect_proxy_rule(#entry{}, list()) -> list().
+detect_proxy_rule(#entry{ name = ParentName
+                        , expression = Expressions
+                        }, Acc) when length(Expressions) == 1 ->
+  [Expression] = Expressions,
+  case Expression of
+    #entry{type = <<"rule_ref">>, name = Name} ->
+      [{ParentName, Name} | Acc];
+    _ ->
+      Acc
+  end;
+detect_proxy_rule(_, Acc) ->
+  Acc.
+
+-spec replace_proxy_rules(list(), #entry{}) -> #entry{}.
+replace_proxy_rules(Rules, Grammar) ->
+  lists:foldl(fun replace_proxy_rule/2, Grammar, Rules).
+
+-spec replace_proxy_rule(#entry{} | list(), binary()) -> #entry{}.
+replace_proxy_rule({From, To}, #entry{ type = <<"rule_ref">>
+                                     , name = From
+                                     } = Entry) ->
+  Entry#entry{name = To};
+replace_proxy_rule(Proxy, #entry{ alternatives = Alternatives
+                                , elements     = Elements
+                                , expression   = Expression
+                                , rules        = Rules
+                                } = Entry) ->
+  Entry#entry{ alternatives = replace_proxy_rule(Proxy, Alternatives)
+             , elements     = replace_proxy_rule(Proxy, Elements)
+             , expression   = replace_proxy_rule(Proxy, Expression)
+             , rules        = replace_proxy_rule(Proxy, Rules)
+             };
+replace_proxy_rule(Proxy, L) when is_list(L) ->
+  [replace_proxy_rule(Proxy, E) || E <- L];
+replace_proxy_rule(_, Other) ->
+  Other.
+

@@ -205,11 +205,12 @@
 -define(CONSTS, pegjs2_consts).
 -define(COUNTER, '__pegjs$counter__').
 -define(CONTEXT, pegjs2_context).
+-define(RULES, pegjs2_rules).
 
 %%_* API =======================================================================
 -spec generate(#analysis{}) -> any().
 generate(#analysis{grammar = Grammar}) ->
-  init_global_tables(),
+  init_global_tables(Grammar),
   Bytecode = lists:flatten(generate(Grammar, #context{})),
   Consts = lists:sort( fun({_, I1}, {_, I2}) -> I1 < I2 end
                      , ets:tab2list(?CONSTS)),
@@ -589,8 +590,9 @@ build_loop(CondCode, BodyCode) ->
 
 %% TODO!! FIXME!!
 -spec index_of_rule(binary()) -> integer().
-index_of_rule(_Name) ->
-  0.
+index_of_rule(Name) ->
+  [{_, Result}] = ets:lookup(?RULES, Name),
+  Result.
 
 %% TODO!! FIXME!!
 -spec escape_for_regexp_class(binary()) -> binary().
@@ -603,18 +605,27 @@ flatten(L) when is_list(L) ->
 flatten(Any) ->
   [Any].
 
--spec init_global_tables() -> ok.
-init_global_tables() ->
+-spec init_global_tables(#entry{}) -> ok.
+init_global_tables(Grammar) ->
   try ets:new(?CONSTS, [set, named_table])
   catch _:_ -> ets:delete_all_objects(?CONSTS)
   end,
   try ets:new(?CONTEXT, [set, named_table])
   catch _:_ -> ets:delete_all_objects(?CONTEXT)
   end,
+  try ets:new(?RULES, [set, named_table])
+  catch _:_ -> ets:delete_all_objects(?RULES)
+  end,
   ets:insert(?CONSTS, {?COUNTER, -1}),
-  ets:insert(?CONTEXT, {?COUNTER, -1}).
+  ets:insert(?CONTEXT, {?COUNTER, -1}),
+  lists:foldl(fun(Rule, Inc) ->
+                ets:insert(?RULES, {Rule#entry.name, Inc}),
+                Inc + 1
+              end, 0, Grammar#entry.rules),
+  ok.
 
 -spec teardown_global_tables() -> ok.
 teardown_global_tables() ->
   ets:delete(?CONSTS),
-  ets:delete(?CONTEXT).
+  ets:delete(?CONTEXT),
+  ets:delete(?RULES).

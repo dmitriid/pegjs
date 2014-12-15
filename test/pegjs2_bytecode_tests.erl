@@ -425,14 +425,17 @@ bytecode_test_() ->
               )
 
 %% TODO:
-%%     , run_test( "for rule_ref"
-%%               , "start = other\n"
-%%                 "other = \"other\""
-%%               , [
-%%                   23, 1 %% RULE
-%%                 ]
-%%               , []
-%%               )
+    , run_test( "for rule_ref"
+              , "start = other\n"
+                "other = \"other\""
+              , [
+                  23, 1,       %% RULE
+                  14, 0, 2, 2, %% MATCH_STRING
+                  18, 0,       %%   * ACCEPT_STRING
+                  19, 1        %%   * FAIL
+                ]
+              , []
+              )
     , run_test( "for literal, empty"
               , "start = \"\""
               , [

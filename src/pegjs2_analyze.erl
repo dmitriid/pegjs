@@ -58,7 +58,9 @@ analyze(Options0) ->
 analyze(Grammar, Options) ->
   case perform_analysis(Grammar, #analysis{options = Options}) of
     {error, _} = Error -> Error;
-    Analysis -> Analysis#analysis{grammar = Grammar}
+    Analysis -> Analysis#analysis{ grammar = Grammar
+                                 , combinators = retrieve_combinators(Grammar)
+                                 }
   end.
 
 -spec perform_analysis(#entry{}, #analysis{}) -> any().
@@ -77,13 +79,10 @@ perform_analysis(#entry{ type = <<"rule">>
                        , display_name = _DisplayName
                        , expression = Expression
                        , index = Idx
-                       } = Entry, #analysis{ combinators = Combinators0
-                                           , unique_rules = Rules0
-                                           } = Analysis) ->
-  Combinators = dict:store(Name, Entry, Combinators0),
+                       }, #analysis{ unique_rules = Rules0
+                                   } = Analysis) ->
   Rules = dict:store(Name, Idx, Rules0),
-  perform_analysis(Expression, Analysis#analysis{ combinators = Combinators
-                                                , unique_rules = Rules});
+  perform_analysis(Expression, Analysis#analysis{ unique_rules = Rules});
 perform_analysis(#entry{ type = <<"named">>
                        , expression = Expression
                        }, Analysis) ->
@@ -94,11 +93,15 @@ perform_analysis(#entry{ type = <<"choice">>
   perform_analysis(Alternatives, Analysis);
 perform_analysis(#entry{ type = <<"action">>
                        , expression = Alternatives
-                       , code = Code
+                       , code = Code0
                        , index = Idx
-                       }, #analysis{code = Codes0} = Analysis) ->
-  Codes = dict:store(Idx, Code, Codes0),
-  perform_analysis(Alternatives, Analysis#analysis{code = Codes});
+                       }, #analysis{ code   = Codes0 } = Analysis) ->
+    case perform_code_analysis(Code0) of
+      {error, _} = E -> E;
+      {ok, F} ->
+        Codes = dict:store(Idx, F, Codes0),
+        perform_analysis(Alternatives, Analysis#analysis{code = Codes})
+    end;
 perform_analysis(#entry{ type = <<"sequence">>
                        , elements = Elements
                        }, Analysis) ->
@@ -145,6 +148,94 @@ perform_analysis(#entry{ type = <<"any">>
                        }, Analysis) ->
   Analysis.
 
+-spec retrieve_combinators(#entry{} | [#entry{}]) -> dict:dict().
+retrieve_combinators(#entry{type = <<"grammar">>
+                           , rules = Rules
+                           , index = Index
+                           }) ->
+  retrieve_combinators(Rules, dict:new(), Index).
+
+-spec retrieve_combinators( #entry{} | [#entry{}]
+                          , dict:dict()
+                          , index()
+                          ) -> dict:dict().
+retrieve_combinators([], Combinators, _) ->
+  Combinators;
+retrieve_combinators(undefined, Combinators, _) ->
+  Combinators;
+retrieve_combinators([H|T], Combinators0, Idx) ->
+  retrieve_combinators(T, retrieve_combinators(H, Combinators0, Idx), Idx);
+retrieve_combinators(#entry{ type = Type
+                           , expression = Expression
+                           , alternatives = Alternatives
+                           , elements = Elements
+                           , index = EntryIdx
+                           }, Combinators0, Idx) ->
+  Cs0 = retrieve_combinators(Expression, Combinators0, EntryIdx),
+  Cs1 = retrieve_combinators(Alternatives, Cs0, EntryIdx),
+  Cs  = retrieve_combinators(Elements, Cs1, EntryIdx),
+  case is_combinator(Type) of
+    false -> Cs;
+    true  ->
+      case dict:find(Type, Cs) of
+        'error'    ->
+          dict:store(Type, [Idx], Cs);
+        {ok, Idxs} ->
+          dict:store(Type, [Idx | Idxs], Cs)
+      end
+  end.
+
+-spec is_combinator(binary()) -> boolean().
+is_combinator(Type) ->
+  lists:member(Type, [ <<"any">>
+                     , <<"class">>
+                     , <<"literal">>
+                     , <<"rule_ref">>
+                     , <<"one_or_more">>
+                     , <<"zero_or_more">>
+                     , <<"optional">>
+                     , <<"simple_not">>
+                     , <<"simple_and">>
+                     , <<"text">>
+                     , <<"labeled">>
+                     , <<"sequence">>
+                     , <<"action">>
+                     , <<"choice">>
+                     , <<"named">>]).
+
+-spec perform_code_analysis(binary()) ->
+  {ok, #function{}} | {error, term()}.
+perform_code_analysis(<<>>) ->
+  {error, missing_action_code};
+perform_code_analysis([Code]) ->
+  case validate_code(Code) of
+    {error, _} = E -> E;
+    {ok, Args}     -> {ok, #function{arg = Args, code= <<Code/binary, ".">>}}
+  end.
+
+-spec validate_code(binary()) -> {ok, list()} | {error, term()}.
+validate_code(Code) ->
+  Source = binary_to_list(Code),
+  case erl_scan:string(Source) of
+    {error, Info, Location} ->
+      {error, {Info, Location}};
+    {ok, Tokens, EndLocation} ->
+      %% We add the dot token so that it makes a complete
+      %% expression list.
+      case erl_parse:parse_exprs(Tokens ++ [{dot, EndLocation}]) of
+        {ok, _ExprList} ->
+          case code_uses_node_var(Tokens) of
+            true  -> {ok, <<"Node">>};
+            false -> {ok, <<"_Node">>}
+          end;
+        {error, {_, _, Info}} ->
+          {error, iolist_to_binary(Info)}
+      end
+  end.
+
+-spec code_uses_node_var(list()) -> boolean().
+code_uses_node_var(Tokens) ->
+  [] /= [node || {var, _, 'Node'} <- Tokens].
 
 -spec report_missing_rules(#analysis{}) -> any().
 report_missing_rules(#analysis{ unique_rules = Rules
@@ -273,4 +364,3 @@ replace_proxy_rule(Proxy, L) when is_list(L) ->
   [replace_proxy_rule(Proxy, E) || E <- L];
 replace_proxy_rule(_, Other) ->
   Other.
-

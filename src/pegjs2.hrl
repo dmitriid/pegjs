@@ -17,6 +17,10 @@
                , description :: binary()
                }).
 
+-record(function, { arg = <<>>
+                  , code = <<>>
+                  }).
+
 -ifndef(index).
 -define(index, {}).
 -type index() :: {Line :: integer(), Column :: integer()}.
@@ -31,4 +35,5 @@
                   , initializer    = <<>>
                   , options        = []
                   , grammar        = #entry{}
+                  , data           = []
                   }).

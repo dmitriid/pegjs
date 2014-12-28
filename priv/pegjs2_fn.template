@@ -1,0 +1,110 @@
+%% -type index() :: {{line, pos_integer()}, {column, pos_integer()}}.
+-type input() :: binary().
+-ifndef(index).
+-type index() :: {{line, integer()}, {column, integer()}}.
+-endif.
+-type parse_failure() :: {error, term()}.
+-type parse_success() :: {term(), input(), index()}.
+-type parse_result() :: parse_failure() | parse_success().
+-type parse_fun() :: fun((input(), index()) -> parse_result()).
+%-type xform_fun() :: fun((input(), index()) -> term()).
+
+-record(pegjs_node, { input = <<>>
+                    , index = {{line, 1}, {column, 1}}
+                    , options = []
+                    , match = []
+                    }).
+
+-define(DEBUG(W, Z), io:format("\n-------------\n" ++ W, Z)).
+
+%-spec pegjs(input(), index(), binary(), parse_fun()
+%, xform_fun()
+%) -> parse_result().
+-spec pegjs(#pegjs_node{}, binary(), parse_fun()) -> parse_result().
+pegjs(#pegjs_node{index = StartIndex} = Node, Name, ParseFun) ->
+  case get_memo(StartIndex, Name) of                 % See if the current reduction is memoized
+    {ok, Memo} ->                                    % If it is, return the stored result
+      Memo;
+    _ ->                                             % If not, attempt to parse
+      Result = case ParseFun(Node) of
+        {error,_} = Failure ->                       % If it fails, memoize the failure
+          Failure;
+        #pegjs_node{} = Match ->                     % If it passes, transform and memoize the result.
+          % Transformed = TransformFun(Match, StartIndex),
+          %{Transformed, InpRem, NewIndex}
+          Match
+      end,
+      memoize(StartIndex, Name, Result),
+      Result
+  end.
+
+-spec setup_memo() -> ets:tid().
+setup_memo() ->
+  put({parse_memo_table, ?MODULE}, ets:new(?MODULE, [set])).
+
+-spec release_memo() -> true.
+release_memo() ->
+  ets:delete(memo_table_name()).
+
+-spec memoize(index(), atom(), term()) -> true.
+memoize(Index, Name, Result) ->
+  Memo = case ets:lookup(memo_table_name(), Index) of
+              [] -> [];
+              [{Index, Plist}] -> Plist
+         end,
+  ets:insert(memo_table_name(), {Index, [{Name, Result}|Memo]}).
+
+-spec get_memo(index(), atom()) -> {ok, term()} | {error, not_found}.
+get_memo(Index, Name) ->
+  case ets:lookup(memo_table_name(), Index) of
+    [] -> {error, not_found};
+    [{Index, Plist}] ->
+      case proplists:lookup(Name, Plist) of
+        {Name, Result}  -> {ok, Result};
+        _  -> {error, not_found}
+      end
+    end.
+
+-spec memo_table_name() -> ets:tid().
+memo_table_name() ->
+    get({parse_memo_table, ?MODULE}).
+
+%%_* Implemented combinators ===================================================
+
+%pegjs_combinator('prefixed', {semantic_and, _}, TransformFun) ->
+%  fun(#pegjs_node{input = Input, index = Index} = Node) ->
+%    case TransformFun(Node) of
+%      {error, Reason} -> {error, {Reason, Index}};
+%      _ -> {[], Node}
+%    end
+%  end;
+%pegjs_combinator('prefixed', {semantic_not, _}, TransformFun) ->
+%  fun(#pegjs_node{input = Input, index = Index} = Node) ->
+%    case TransformFun(Node) of
+%      {error, _} -> {[], Node};
+%      Result -> {error, {expected, {no_match, Result}, Index}}
+%    end
+%  end;
+
+%pegjs_combinator(Name, _, _) ->
+%  {error, {invalid_combinator, Name}}.
+
+p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
+  lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
+p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters
+  {{line, Line}, {column, Col}} = Index,
+  case MatchedInput of
+    $\n -> {{line, Line+1}, {column, 1}};
+    _ -> {{line, Line}, {column, Col+1}}
+  end.
+
+match(#pegjs_node{match = Match}) -> Match;
+match(Other)                      -> Other.
+
+index(#pegjs_node{index = Index}) -> Index;
+index(Other)                      -> Other.
+
+input(#pegjs_node{input = Input}) -> Input;
+input(Other)                      -> Other.
+
+

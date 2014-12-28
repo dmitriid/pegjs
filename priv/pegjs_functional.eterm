@@ -1,0 +1,257 @@
+%% Format is:
+%% {combinator_name, [required_combinators], <<"code">>}
+
+{<<"any">>, [],
+<<"any() ->\n"
+, "  fun(#pegjs_node{input = Input, index = Index} = Node) when is_binary(Input) ->\n"
+, "    case Input of\n"
+, "      <<>> ->\n"
+, "        {error, {expected, any_character, Index}};\n"
+, "      <<C/utf8, Rest/binary>> ->\n"
+, "        Node#pegjs_node{ input = Rest\n"
+, "                       , index = p_advance_index(<<C/utf8>>, Index)\n"
+, "                       , match = <<C/utf8>>\n"
+, "                       }\n"
+, "    end\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"choice">>, [<<"attempt">>],
+<<"choice(Parsers) ->\n"
+, "  fun(Node) ->\n"
+, "      attempt(Parsers, Node, none)\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"attempt">>, [],
+<<"attempt([], _, Failure) -> Failure;\n"
+, "attempt([P|Parsers], Node, FirstFailure) ->\n"
+, "  case P(Node) of\n"
+, "    {error, _} = Failure ->\n"
+, "      case FirstFailure of\n"
+, "        none -> attempt(Parsers, Node, Failure);\n"
+, "        _    -> attempt(Parsers, Node, FirstFailure)\n"
+, "      end;\n"
+, "    Result -> Result\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"sequence">>, [<<"all">>],
+<<"sequence(P) ->\n"
+, "  fun(Node) ->\n"
+, "      all(P, Node, [], fun(N) -> N end)\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"all">>, [],
+<<"all([], Node0, Accum, TransformFun) ->\n"
+, "  Result = lists:reverse(Accum),\n"
+, "  case TransformFun(Node0#pegjs_node{input = Result}) of\n"
+, "    {error, _} = E -> E;\n"
+, "    _ -> Node0#pegjs_node{match = Result}\n"
+, "  end;\n"
+, "all([P|Parsers], Node0, Accum, TransformFun) ->\n"
+, "  case P(Node0) of\n"
+, "    {error, _} = Failure -> Failure;\n"
+, "    #pegjs_node{match = Result} = Node -> all(Parsers, Node, [Result|Accum], TransformFun)\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"literal">>, [],
+<<"literal(String, IsCaseInsensitive) ->\n"
+, "    Length = erlang:byte_size(String),\n"
+, "    fun(#pegjs_node{input = Input, index = Index} = Node) ->\n"
+, "      case Input of\n"
+, "        <<String:Length/binary, Rest/binary>> ->\n"
+, "          Node#pegjs_node{ input = Rest\n"
+, "                         , index = p_advance_index(String, Index)\n"
+, "                         , match = String\n"
+, "                         };\n"
+, "        _ ->\n"
+, "          Modifier = case IsCaseInsensitive of\n"
+, "                       true  -> case_insensitive;\n"
+, "                       false -> case_sensitive\n"
+, "                     end,\n"
+, "          case IsCaseInsensitive of\n"
+, "            false ->\n"
+, "              {error, {match_failed, {{String, Modifier}, Input}, Index}};\n"
+, "            true ->\n"
+, "              case re:run( Input\n"
+, "                         , <<\"^[\", String/binary, \"](.*)\">>\n"
+, "                         , [caseless]) of\n"
+, "                {match, [{_, Len}, _]} ->\n"
+, "                  <<Result:Len/binary, Rest/binary>> = Input,\n"
+, "                  Node#pegjs_node{ input = Rest\n"
+, "                                 , index = p_advance_index(Result, Index)\n"
+, "                                 , match = Result\n"
+, "                                 };\n"
+, "                {match, _} ->\n"
+, "                  Node#pegjs_node{ input = <<>>\n"
+, "                                 , index = p_advance_index(String, Index)\n"
+, "                                 , match = Input\n"
+, "                                 };\n"
+, "                nomatch    ->\n"
+, "                  {error, {match_failed, {{String, Modifier}, Input}, Index}}\n"
+, "              end\n"
+, "          end\n"
+, "      end\n"
+, "    end.\n\n"
+>>
+}.
+
+{<<"regexp">>, [],
+<<"regexp(Regexp0, IsIgnoreCase) ->\n"
+, "    Regexp = unicode:characters_to_binary(Regexp0),\n"
+, "    Options0 = [unicode, dotall, anchored],\n"
+, "    Options = case IsIgnoreCase of\n"
+, "                true  -> [caseless | Options0];\n"
+, "                false -> Options0\n"
+, "              end,\n"
+, "    {ok, RE} = re:compile(Regexp, Options),\n"
+, "    fun(#pegjs_node{input = Input, index = Index} = Node) ->\n"
+, "        case re:run(Input, RE) of\n"
+, "            {match, [{0, Length}|_]} ->\n"
+, "                {Head, Tail} = erlang:split_binary(Input, Length),\n"
+, "                Node#pegjs_node{ input = Tail\n"
+, "                               , index = p_advance_index(Head, Index)\n"
+, "                               , match = Head\n"
+, "                               };\n"
+, "            _ ->\n"
+, "              Modifier = case IsIgnoreCase of\n"
+, "                             true  -> case_insensitive;\n"
+, "                             false -> case_sensitive\n"
+, "                           end,\n"
+, "              {error, { expected\n"
+, "                      , {regexp, binary_to_list(Regexp), Modifier}\n"
+, "                      , Index}}\n"
+, "        end\n"
+, "    end.\n\n"
+>>
+}.
+
+{<<"rule_ref">>, [],
+<<"rule_ref(Rule) ->\n"
+, "    fun(Node) ->\n"
+, "        pegjs_rule(Rule, Node)\n"
+, "    end.\n\n"
+>>
+}.
+
+{<<"suffixed">>, [<<"scan">>],
+<<"suffixed(zero_or_more, P) ->\n"
+, "  fun(Node) ->\n"
+, "      scan(P, Node, [])\n"
+, "  end;\n"
+, "suffixed(one_or_more, P) ->\n"
+, "  fun(#pegjs_node{index = Index} = Node)->\n"
+, "      Result = scan(P, Node, []),\n"
+, "      case Result of\n"
+, "        #pegjs_node{match = [_|_]} ->\n"
+, "          Result;\n"
+, "        _ ->\n"
+, "          {error, {_, Failure, _}} = P(Node),\n"
+, "          {error, {expected, {at_least_one, Failure}, Index}}\n"
+, "      end\n"
+, "  end;\n"
+, "suffixed(optional, P) ->\n"
+, "  fun(Node) ->\n"
+, "      case P(Node) of\n"
+, "        {error,_} -> Node#pegjs_node{match = []};\n"
+, "        Success -> Success\n"
+, "      end\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"text">>, [<<"convert_to_iolist">>],
+<<"text(P) ->\n"
+, "  fun(Node0) ->\n"
+, "      Result = P(Node0),\n"
+, "      case Result of\n"
+, "        {error, _} = E -> E;\n"
+, "        #pegjs_node{match = MaybeIoList} = Node ->\n"
+, "          IoList = convert_to_iolist(MaybeIoList),\n"
+, "          Node#pegjs_node{match = iolist_to_binary(IoList)}\n"
+, "      end\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"scan">>, [],
+<<"scan(_, #pegjs_node{input = []} = Node, Accum) ->\n"
+, "  Node#pegjs_node{match = lists:reverse(Accum)};\n"
+, "scan(P, Node0, Accum) ->\n"
+, "  case P(Node0) of\n"
+, "    {error,_N} -> Node0#pegjs_node{match = lists:reverse(Accum)};\n"
+, "    #pegjs_node{match = Result} = Node -> scan(P, Node, [Result | Accum])\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"prefixed">>, [],
+<<"prefixed(simple_not, P) ->\n"
+, "  fun(#pegjs_node{index = Index} = Node0)->\n"
+, "      case P(Node0) of\n"
+, "        {error,_} ->\n"
+, "          Node0#pegjs_node{match = []};\n"
+, "        Node      ->\n"
+, "          {error, {expected, {no_match, Node#pegjs_node.match}, Index}}\n"
+, "      end\n"
+, "  end;\n"
+, "prefixed(simple_and, P) ->\n"
+, "  fun(Node) ->\n"
+, "    case P(Node) of\n"
+, "      {error, _} = Failure -> Failure;\n"
+, "      _ -> Node#pegjs_node{match = []}\n"
+, "    end\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<"labeled">>, [],
+<<"labeled(Tag, P) ->\n"
+, "  fun(Node0) ->\n"
+, "      case P(Node0) of\n"
+, "        {error,_} = Failure ->\n"
+, "           Failure;\n"
+, "        #pegjs_node{match = Match} = Node ->\n"
+, "          case Tag of\n"
+, "            undefined -> Node;\n"
+, "            _         -> Node#pegjs_node{match = {Tag, Match}}\n"
+, "          end\n"
+, "      end\n"
+, "  end.\n\n"
+>>
+}.
+
+{<<" convert_to_iolist">>, [],
+<<"convert_to_iolist(MaybeIoList) ->\n"
+, "  convert_to_iolist(MaybeIoList, []).\n\n"
+
+, "convert_to_iolist([], Acc) ->\n"
+, "  lists:reverse(Acc);\n"
+, "convert_to_iolist([H | T], Acc) ->\n"
+, "  convert_to_iolist(T, [convert_to_iolist(H) | Acc]);\n"
+, "convert_to_iolist({Label, Value}, Acc) when is_binary(Label) ->\n"
+, "  [convert_to_iolist(Value) | Acc];\n"
+, "convert_to_iolist(Other, Acc) ->\n"
+, "  convert_to_iolist([], [Other | Acc]).\n\n"
+>>
+}.
+
+{<<"class">>, [<<"regexp">>], <<>>}.
+{<<"one_or_more">>, [<<"suffixed">>], <<>>}.
+{<<"zero_or_more">>, [<<"suffixed">>], <<>>}.
+{<<"optional">>, [<<"suffixed">>], <<>>}.
+{<<"simple_not">>, [<<"prefixed">>], <<>>}.
+{<<"simple_and">>, [<<"prefixed">>], <<>>}.
+{<<"semantic_and">>, [<<"prefixed">>], <<>>}.
+{<<"semantic_not">>, [<<"prefixed">>], <<>>}.
+%% TODO
+{<<"action">>, [], <<>>}.
+{<<"named">>, [], <<>>}.

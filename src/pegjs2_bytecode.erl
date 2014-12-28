@@ -209,14 +209,13 @@
 
 %%_* API =======================================================================
 -spec generate(#analysis{}) -> any().
-generate(#analysis{grammar = Grammar}) ->
+generate(#analysis{grammar = Grammar} = Analysis) ->
   init_global_tables(Grammar),
   Bytecode = lists:flatten(generate(Grammar, #context{})),
   Consts = lists:sort( fun({_, I1}, {_, I2}) -> I1 < I2 end
                      , ets:tab2list(?CONSTS)),
   teardown_global_tables(),
-  {Bytecode, Consts, Grammar}.
-
+  Analysis#analysis{data = [{bytecode, Bytecode}, {consts, Consts}]}.
 
 %%_* Internal ==================================================================
 -spec generate(#entry{}, #context{}) -> any().

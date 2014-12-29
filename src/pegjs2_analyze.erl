@@ -264,42 +264,41 @@ report_missing_rules(#analysis{ unique_rules = Rules
   end.
 
 -spec report_left_recursion(#analysis{}) -> any().
-report_left_recursion(#analysis{combinators = Combinators} = Analysis) ->
-  case dict:fold(fun(_, Value, Acc) ->
-                   case check_left_recursion(Value, Analysis, dict:new()) of
-                     {ok, _} -> Acc;
-                     Other   -> [Other | Acc]
-                   end
-                 end, [], Combinators) of
-    []    -> Analysis;
-    Rules -> {error, {left_recursion, Rules}}
+report_left_recursion(#analysis{grammar = #entry{rules = Rules}} = Analysis) ->
+  case lists:foldl(fun(E, Acc) ->
+                     case check_left_recursion(E, Rules, []) of
+                       {ok, _} -> Acc;
+                       Other   -> [Other, Acc]
+                     end
+                   end, [], Rules) of
+    [] -> Analysis;
+    RecursiveRules -> {error, {left_recursion, RecursiveRules}}
   end.
 
-check_left_recursion([], _, AppliedRules) ->
-  {ok, AppliedRules};
-check_left_recursion([H|T], Analysis, AppliedRules) ->
-  case check_left_recursion(H, Analysis, AppliedRules) of
-    {ok, Rules} -> check_left_recursion(T, Analysis, [Rules | AppliedRules]);
-    Other       -> Other
-  end;
-check_left_recursion( #entry{ type = <<"rule">>
-                            , name = Name
-                            , expression = Expression}
-                    , Analysis
-                    , AppliedRules) ->
-  check_left_recursion(Expression, Analysis, dict:store(Name, Name, AppliedRules));
+-spec check_left_recursion(#entry{}, [#entry{}], [binary()]) ->
+                                                      {ok, term()} | [binary()].
+check_left_recursion(#entry{ type = <<"rule">>
+                           , name = Name
+                           , expression = Expression0
+                           }, Rules, AppliedRules) ->
+  Expression = case Expression0 of
+                 [E] -> E;
+                 #entry{} -> Expression0
+               end,
+  check_left_recursion(Expression, Rules, [Name | AppliedRules]);
 check_left_recursion(#entry{ type = <<"sequence">>
-                           , elements = [H|_]}, Analysis, AppliedRules) ->
-  check_left_recursion(H, Analysis, AppliedRules);
+                           , elements = [H | _]
+                           }, Rules, AppliedRules) ->
+  check_left_recursion(H, Rules, AppliedRules);
 check_left_recursion(#entry{ type = <<"rule_ref">>
                            , name = Name
                            , index = Idx
-                           }, #analysis{combinators = Rules} = Analysis, AppliedRules) ->
-  case dict:find(Name, AppliedRules) of
-    {ok, _} -> {Name, Idx};
-    error   ->
-      {ok, Entry} = dict:find(Name, Rules),
-      check_left_recursion(Entry, Analysis, AppliedRules)
+                           } = Ref, Rules, AppliedRules) ->
+  case lists:member(Name, AppliedRules) of
+    true  -> {Name, Idx};
+    false ->
+      [Entry] = [E || E <- Rules, E#entry.name =:= Name, E /= Ref],
+      check_left_recursion(Entry, Rules, AppliedRules)
   end;
 check_left_recursion(_, _, AppliedRules) ->
   {ok, AppliedRules}.

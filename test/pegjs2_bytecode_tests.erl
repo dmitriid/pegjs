@@ -608,11 +608,12 @@ consts(Description0, Grammar, ExpectedConsts) ->
 
 %%_* Helpers ===================================================================
 get_bytecode(Grammar) ->
-  {Bytecode, _, _} = parse(Grammar),
-  Bytecode.
+  #analysis{data = Data} = parse(Grammar),
+  proplists:get_value(bytecode, Data).
 
 get_consts(Grammar) ->
-  {_, Consts, _} = parse(Grammar),
+  #analysis{data = Data} = parse(Grammar),
+  Consts = proplists:get_value(consts, Data),
   [K || {K, _} <- Consts, K /= '__pegjs$counter__'].
 
 parse(Grammar) ->

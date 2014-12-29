@@ -19,6 +19,7 @@
 
 -record(function, { arg = <<>>
                   , code = <<>>
+                  , index = {{line, 1}, {column, 1}}
                   }).
 
 -ifndef(index).

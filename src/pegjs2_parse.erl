@@ -25,13 +25,16 @@ int(C) when $A =< C, C =< $F ->
 int(C) when $a =< C, C =< $f ->
     C - $a + 10.
 
-hexstr_to_bin(S) ->
-    unicode:characters_to_binary(hexstr_to_list(S)).
-
-hexstr_to_list([X,Y|T]) ->
-    [int(X)*16 + int(Y) | hexstr_to_list(T)];
-hexstr_to_list([]) ->
-    [].
+%% if it's in the form of \u00xx, skip the first two zeroes
+hexstr_to_bin(<<"0", "0", T/binary>>) ->
+    hexstr_to_bin(T);
+hexstr_to_bin(<<X/integer,Y/integer, T/binary>>) ->
+  Int = int(X)*16 + int(Y),
+  <<Int/integer
+  , (hexstr_to_bin(T))/binary
+  >>;
+hexstr_to_bin(<<>>) ->
+  <<>>.
 
 filter_empty_strings(Strings) ->
   filter_empty_strings(Strings, []).
@@ -105,7 +108,7 @@ pegjs_rule(<<"Grammar">>, Input, Index) ->
        , Index
        , <<"Grammar">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"initializer">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"Initializer">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rules">>, [pegjs_combinator('suffixed', {one_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"Rule">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_95_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"initializer">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"Initializer">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rules">>, [pegjs_combinator('suffixed', {one_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"Rule">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_98_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -114,7 +117,7 @@ pegjs_rule(<<"Initializer">>, Input, Index) ->
        , Index
        , <<"Initializer">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EOS">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_98_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EOS">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_101_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -123,7 +126,7 @@ pegjs_rule(<<"Rule">>, Input, Index) ->
        , Index
        , <<"Rule">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"displayName">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("=")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"Expression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EOS">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_121_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"displayName">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("=")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"Expression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EOS">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_124_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -141,7 +144,7 @@ pegjs_rule(<<"ChoiceExpression">>, Input, Index) ->
        , Index
        , <<"ChoiceExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"ActionExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("/")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ActionExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_138_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"ActionExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("/")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ActionExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_141_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -150,7 +153,7 @@ pegjs_rule(<<"ActionExpression">>, Input, Index) ->
        , Index
        , <<"ActionExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"SequenceExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_153_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"SequenceExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_156_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -159,7 +162,7 @@ pegjs_rule(<<"SequenceExpression">>, Input, Index) ->
        , Index
        , <<"SequenceExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"LabeledExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LabeledExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_167_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"LabeledExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LabeledExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_170_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -168,7 +171,7 @@ pegjs_rule(<<"LabeledExpression">>, Input, Index) ->
        , Index
        , <<"LabeledExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"label">>, [pegjs_combinator('rule_ref', <<"Identifier">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(":")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"PrefixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_176_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"PrefixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"label">>, [pegjs_combinator('rule_ref', <<"Identifier">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(":")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"PrefixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_179_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"PrefixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -177,7 +180,7 @@ pegjs_rule(<<"PrefixedExpression">>, Input, Index) ->
        , Index
        , <<"PrefixedExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"PrefixedOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"SuffixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_186_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SuffixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"PrefixedOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"SuffixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_189_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SuffixedExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -195,7 +198,7 @@ pegjs_rule(<<"SuffixedExpression">>, Input, Index) ->
        , Index
        , <<"SuffixedExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"PrimaryExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"SuffixedOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_201_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"PrimaryExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"PrimaryExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"SuffixedOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_204_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"PrimaryExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -213,7 +216,7 @@ pegjs_rule(<<"PrimaryExpression">>, Input, Index) ->
        , Index
        , <<"PrimaryExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LiteralMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CharacterClassMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"AnyMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"RuleReferenceExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SemanticPredicateExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("(")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"Expression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(")")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_216_1/2)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LiteralMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CharacterClassMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"AnyMatcher">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"RuleReferenceExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SemanticPredicateExpression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("(")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"expression">>, [pegjs_combinator('rule_ref', <<"Expression">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(")")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_219_1/2)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -222,7 +225,7 @@ pegjs_rule(<<"RuleReferenceExpression">>, Input, Index) ->
        , Index
        , <<"RuleReferenceExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("=")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_225_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("=")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_228_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -231,7 +234,7 @@ pegjs_rule(<<"SemanticPredicateExpression">>, Input, Index) ->
        , Index
        , <<"SemanticPredicateExpression">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"SemanticPredicateOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_234_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"operator">>, [pegjs_combinator('rule_ref', <<"SemanticPredicateOperator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"__">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"CodeBlock">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_237_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -321,7 +324,7 @@ pegjs_rule(<<"Identifier">>, Input, Index) ->
        , Index
        , <<"Identifier">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('rule_ref', <<"ReservedWord">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_278_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('rule_ref', <<"ReservedWord">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"name">>, [pegjs_combinator('rule_ref', <<"IdentifierName">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_281_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -330,7 +333,7 @@ pegjs_rule(<<"IdentifierName">>, Input, Index) ->
        , Index
        , <<"IdentifierName">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"IdentifierStart">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"IdentifierPart">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_281_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"first">>, [pegjs_combinator('rule_ref', <<"IdentifierStart">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"rest">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"IdentifierPart">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_284_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -339,7 +342,7 @@ pegjs_rule(<<"IdentifierStart">>, Input, Index) ->
        , Index
        , <<"IdentifierStart">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"UnicodeLetter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("$")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("_")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"UnicodeEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_287_1/2)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"UnicodeLetter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("$")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("_")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"UnicodeEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_290_1/2)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -438,7 +441,7 @@ pegjs_rule(<<"LiteralMatcher">>, Input, Index) ->
        , Index
        , <<"LiteralMatcher">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"value">>, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"ignoreCase">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("i")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_373_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"value">>, [pegjs_combinator('rule_ref', <<"StringLiteral">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"ignoreCase">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("i")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_376_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -447,7 +450,7 @@ pegjs_rule(<<"StringLiteral">>, Input, Index) ->
        , Index
        , <<"StringLiteral">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"chars">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"DoubleStringCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_375_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"chars">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"SingleStringCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_377_1/2)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"chars">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"DoubleStringCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_378_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"chars">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('rule_ref', <<"SingleStringCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_380_1/2)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -456,7 +459,7 @@ pegjs_rule(<<"DoubleStringCharacter">>, Input, Index) ->
        , Index
        , <<"DoubleStringCharacter">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_379_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_380_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_382_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_383_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -465,7 +468,7 @@ pegjs_rule(<<"SingleStringCharacter">>, Input, Index) ->
        , Index
        , <<"SingleStringCharacter">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_384_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_385_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_387_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_388_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -474,7 +477,7 @@ pegjs_rule(<<"CharacterClassMatcher">>, Input, Index) ->
        , Index
        , <<"CharacterClassMatcher">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("[")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"inverted">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("^")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"parts">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ClassCharacterRange">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("]")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"ignoreCase">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("i")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_405_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("[")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"inverted">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("^")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"parts">>, [pegjs_combinator('suffixed', {zero_or_more, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ClassCharacterRange">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("]")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"ignoreCase">>, [pegjs_combinator('suffixed', {optional, [pegjs_combinator('literal', {[unicode:characters_to_binary("i")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_408_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -483,7 +486,7 @@ pegjs_rule(<<"ClassCharacterRange">>, Input, Index) ->
        , Index
        , <<"ClassCharacterRange">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"begin">>, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("-")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"end">>, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_416_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {<<"begin">>, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("-")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"end">>, [pegjs_combinator('rule_ref', <<"ClassCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_419_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -492,7 +495,7 @@ pegjs_rule(<<"ClassCharacter">>, Input, Index) ->
        , Index
        , <<"ClassCharacter">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("]")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_418_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_419_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_421_1/2)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("]")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_421_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"sequence">>, [pegjs_combinator('rule_ref', <<"EscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_422_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineContinuation">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_424_1/2)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -501,7 +504,7 @@ pegjs_rule(<<"LineContinuation">>, Input, Index) ->
        , Index
        , <<"LineContinuation">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminatorSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_424_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminatorSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_427_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -510,7 +513,7 @@ pegjs_rule(<<"EscapeSequence">>, Input, Index) ->
        , Index
        , <<"EscapeSequence">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CharacterEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("0")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('rule_ref', <<"DecimalDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_427_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"UnicodeEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"CharacterEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("0")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('rule_ref', <<"DecimalDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_430_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"UnicodeEscapeSequence">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -528,7 +531,7 @@ pegjs_rule(<<"SingleEscapeCharacter">>, Input, Index) ->
        , Index
        , <<"SingleEscapeCharacter">>
        , fun(I, D) ->
-           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("b")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_439_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("f")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_440_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("n")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_441_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("r")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_442_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("t")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_443_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("v")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_445_1/2)], fun(Node, _) -> Node end))(I, D)
+           (pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("'")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\"")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("\\")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("b")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_442_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("f")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_443_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("n")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_444_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("r")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_445_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("t")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_446_3/2), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("v")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_448_1/2)], fun(Node, _) -> Node end))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -537,7 +540,7 @@ pegjs_rule(<<"NonEscapeCharacter">>, Input, Index) ->
        , Index
        , <<"NonEscapeCharacter">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EscapeCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_448_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('prefixed', {simple_not, [pegjs_combinator('choice', [pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"EscapeCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"LineTerminator">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end)], fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"SourceCharacter">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_451_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -555,7 +558,7 @@ pegjs_rule(<<"HexEscapeSequence">>, Input, Index) ->
        , Index
        , <<"HexEscapeSequence">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("x")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('text', pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_460_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("x")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('text', pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_463_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -564,7 +567,7 @@ pegjs_rule(<<"UnicodeEscapeSequence">>, Input, Index) ->
        , Index
        , <<"UnicodeEscapeSequence">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("u")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('text', pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_466_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("u")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"digits">>, [pegjs_combinator('text', pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('rule_ref', <<"HexDigit">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun(Node, _) -> Node end), fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_469_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -591,7 +594,7 @@ pegjs_rule(<<"AnyMatcher">>, Input, Index) ->
        , Index
        , <<"AnyMatcher">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(".")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_475_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary(".")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_478_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -600,7 +603,7 @@ pegjs_rule(<<"CodeBlock">>, Input, Index) ->
        , Index
        , <<"CodeBlock">>
        , fun(I, D) ->
-           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("{")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"Code">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("}")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_478_1/2))(I, D)
+           (pegjs_combinator('sequence', [pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("{")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {<<"code">>, [pegjs_combinator('rule_ref', <<"Code">>, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end), pegjs_combinator('labeled', {undefined, [pegjs_combinator('literal', {[unicode:characters_to_binary("}")], false}, fun(Node, _) -> Node end)]}, fun(Node, _) -> Node end)], fun pegjs_code_481_1/2))(I, D)
          end
        , fun(Node, _Idx) -> Node end
        );
@@ -1073,8 +1076,8 @@ pegjs_rule(<<"EOF">>, Input, Index) ->
        , fun(Node, _Idx) -> Node end
        ).
 
--spec pegjs_code_95_1(iolist(), index()) -> parse_result().
-pegjs_code_95_1(Node, Idx) ->
+-spec pegjs_code_98_1(iolist(), index()) -> parse_result().
+pegjs_code_98_1(Node, Idx) ->
 
       [_, {_, Initializer}, {_, Rules}] = Node,
       #entry{ type        = <<"grammar">>
@@ -1084,12 +1087,12 @@ pegjs_code_95_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_98_1(iolist(), index()) -> parse_result().
-pegjs_code_98_1(Node, Idx) ->
+-spec pegjs_code_101_1(iolist(), index()) -> parse_result().
+pegjs_code_101_1(Node, Idx) ->
  [{_, Code}, _] = Node, #entry{type = <<"initializer">>, code = Code, index = Idx} .
 
--spec pegjs_code_121_1(iolist(), index()) -> parse_result().
-pegjs_code_121_1(Node, Idx) ->
+-spec pegjs_code_124_1(iolist(), index()) -> parse_result().
+pegjs_code_124_1(Node, Idx) ->
 
       [{_, Name}, _, {_, DisplayName}, _, _, {_, Expression}, _] = Node,
       #entry{ type = <<"rule">>
@@ -1099,7 +1102,7 @@ pegjs_code_121_1(Node, Idx) ->
                                 #entry{ type       = <<"named">>
                                       , name       = String
                                       , expression = entries(Expression)
-                                      , index       = Idx
+                                      , index      = Idx
                                       };
                               [] ->
                                 entries(Expression)
@@ -1108,8 +1111,8 @@ pegjs_code_121_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_138_1(iolist(), index()) -> parse_result().
-pegjs_code_138_1(Node, Idx) ->
+-spec pegjs_code_141_1(iolist(), index()) -> parse_result().
+pegjs_code_141_1(Node, Idx) ->
 
       [{_, First}, {_, Rest}] = Node,
       case Rest of
@@ -1123,8 +1126,8 @@ pegjs_code_138_1(Node, Idx) ->
       end
     .
 
--spec pegjs_code_153_1(iolist(), index()) -> parse_result().
-pegjs_code_153_1(Node, Idx) ->
+-spec pegjs_code_156_1(iolist(), index()) -> parse_result().
+pegjs_code_156_1(Node, Idx) ->
 
       [{_, Expression}, {_, Code}] = Node,
       case Code of
@@ -1139,8 +1142,8 @@ pegjs_code_153_1(Node, Idx) ->
       end
     .
 
--spec pegjs_code_167_1(iolist(), index()) -> parse_result().
-pegjs_code_167_1(Node, Idx) ->
+-spec pegjs_code_170_1(iolist(), index()) -> parse_result().
+pegjs_code_170_1(Node, Idx) ->
 
       [{_, First}, {_, Rest}] = Node,
       case Rest of
@@ -1154,8 +1157,8 @@ pegjs_code_167_1(Node, Idx) ->
       end
     .
 
--spec pegjs_code_176_3(iolist(), index()) -> parse_result().
-pegjs_code_176_3(Node, Idx) ->
+-spec pegjs_code_179_3(iolist(), index()) -> parse_result().
+pegjs_code_179_3(Node, Idx) ->
 
       [{_, Label}, _, _, _, {_, Expression}] = Node,
       #entry{ type       = <<"labeled">>
@@ -1165,8 +1168,8 @@ pegjs_code_176_3(Node, Idx) ->
             }
     .
 
--spec pegjs_code_186_3(iolist(), index()) -> parse_result().
-pegjs_code_186_3(Node, Idx) ->
+-spec pegjs_code_189_3(iolist(), index()) -> parse_result().
+pegjs_code_189_3(Node, Idx) ->
 
       [{_, Operator}, _, {_, Expression}] = Node,
       #entry{ type       = ops_to_prefixed_types(Operator)
@@ -1175,8 +1178,8 @@ pegjs_code_186_3(Node, Idx) ->
             }
     .
 
--spec pegjs_code_201_3(iolist(), index()) -> parse_result().
-pegjs_code_201_3(Node, Idx) ->
+-spec pegjs_code_204_3(iolist(), index()) -> parse_result().
+pegjs_code_204_3(Node, Idx) ->
 
       [{_, Expression}, _, {_, Operator}] = Node,
       #entry{ type       = ops_to_suffixed_types(Operator)
@@ -1185,12 +1188,12 @@ pegjs_code_201_3(Node, Idx) ->
             }
     .
 
--spec pegjs_code_216_1(iolist(), index()) -> parse_result().
-pegjs_code_216_1(Node, _Idx) ->
+-spec pegjs_code_219_1(iolist(), index()) -> parse_result().
+pegjs_code_219_1(Node, _Idx) ->
  [_, _, {_, Expression}, _, _] = Node, Expression .
 
--spec pegjs_code_225_1(iolist(), index()) -> parse_result().
-pegjs_code_225_1(Node, Idx) ->
+-spec pegjs_code_228_1(iolist(), index()) -> parse_result().
+pegjs_code_228_1(Node, Idx) ->
 
       [{_, Name}, _] = Node,
       #entry{ type  = <<"rule_ref">>
@@ -1199,8 +1202,8 @@ pegjs_code_225_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_234_1(iolist(), index()) -> parse_result().
-pegjs_code_234_1(Node, Idx) ->
+-spec pegjs_code_237_1(iolist(), index()) -> parse_result().
+pegjs_code_237_1(Node, Idx) ->
 
       [{_, Operator}, _, {_, Code}] = Node,
       #entry{ type  = ops_to_semantic_predicate_types(Operator)
@@ -1209,20 +1212,20 @@ pegjs_code_234_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_278_1(iolist(), index()) -> parse_result().
-pegjs_code_278_1(Node, _Idx) ->
- [_, {_, Name}] = Node, Name .
-
 -spec pegjs_code_281_1(iolist(), index()) -> parse_result().
 pegjs_code_281_1(Node, _Idx) ->
+ [_, {_, Name}] = Node, Name .
+
+-spec pegjs_code_284_1(iolist(), index()) -> parse_result().
+pegjs_code_284_1(Node, _Idx) ->
  [{_, First}, {_, Rest}] = Node, iolist_to_binary([First, Rest]) .
 
--spec pegjs_code_287_1(iolist(), index()) -> parse_result().
-pegjs_code_287_1(Node, _Idx) ->
+-spec pegjs_code_290_1(iolist(), index()) -> parse_result().
+pegjs_code_290_1(Node, _Idx) ->
  [_, {_, Sequence}] = Node, Sequence .
 
--spec pegjs_code_373_1(iolist(), index()) -> parse_result().
-pegjs_code_373_1(Node, Idx) ->
+-spec pegjs_code_376_1(iolist(), index()) -> parse_result().
+pegjs_code_376_1(Node, Idx) ->
 
       [{_, Value}, {_, IgnoreCase}] = Node,
       #entry{ type        = <<"literal">>
@@ -1232,32 +1235,32 @@ pegjs_code_373_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_375_3(iolist(), index()) -> parse_result().
-pegjs_code_375_3(Node, _Idx) ->
+-spec pegjs_code_378_3(iolist(), index()) -> parse_result().
+pegjs_code_378_3(Node, _Idx) ->
  [_, {_, Chars}, _] = Node, iolist_to_binary(Chars) .
 
--spec pegjs_code_377_1(iolist(), index()) -> parse_result().
-pegjs_code_377_1(Node, _Idx) ->
+-spec pegjs_code_380_1(iolist(), index()) -> parse_result().
+pegjs_code_380_1(Node, _Idx) ->
  [_, {_, Chars}, _] = Node, iolist_to_binary(Chars) .
 
--spec pegjs_code_379_3(iolist(), index()) -> parse_result().
-pegjs_code_379_3(Node, _Idx) ->
+-spec pegjs_code_382_3(iolist(), index()) -> parse_result().
+pegjs_code_382_3(Node, _Idx) ->
  text(Node) .
 
--spec pegjs_code_380_3(iolist(), index()) -> parse_result().
-pegjs_code_380_3(Node, _Idx) ->
+-spec pegjs_code_383_3(iolist(), index()) -> parse_result().
+pegjs_code_383_3(Node, _Idx) ->
  [_, {_, Sequence}] = Node, Sequence .
 
--spec pegjs_code_384_3(iolist(), index()) -> parse_result().
-pegjs_code_384_3(Node, _Idx) ->
+-spec pegjs_code_387_3(iolist(), index()) -> parse_result().
+pegjs_code_387_3(Node, _Idx) ->
  text(Node) .
 
--spec pegjs_code_385_3(iolist(), index()) -> parse_result().
-pegjs_code_385_3(Node, _Idx) ->
+-spec pegjs_code_388_3(iolist(), index()) -> parse_result().
+pegjs_code_388_3(Node, _Idx) ->
  [_, {_, Sequence}] = Node, Sequence .
 
--spec pegjs_code_405_1(iolist(), index()) -> parse_result().
-pegjs_code_405_1(Node, Idx) ->
+-spec pegjs_code_408_1(iolist(), index()) -> parse_result().
+pegjs_code_408_1(Node, Idx) ->
 
       [_, {_, Inverted}, {_, Parts0}, _, {_, IgnoreCase}] = Node,
       Parts = filter_empty_strings(Parts0),
@@ -1270,8 +1273,8 @@ pegjs_code_405_1(Node, Idx) ->
             }
     .
 
--spec pegjs_code_416_1(iolist(), index()) -> parse_result().
-pegjs_code_416_1(Node, Idx) ->
+-spec pegjs_code_419_1(iolist(), index()) -> parse_result().
+pegjs_code_419_1(Node, Idx) ->
 
       [{_, Begin}, _, {_, End}] = Node,
       case Begin > End of
@@ -1282,74 +1285,74 @@ pegjs_code_416_1(Node, Idx) ->
       end
     .
 
--spec pegjs_code_418_3(iolist(), index()) -> parse_result().
-pegjs_code_418_3(Node, _Idx) ->
+-spec pegjs_code_421_3(iolist(), index()) -> parse_result().
+pegjs_code_421_3(Node, _Idx) ->
  text(Node) .
 
--spec pegjs_code_419_3(iolist(), index()) -> parse_result().
-pegjs_code_419_3(Node, _Idx) ->
+-spec pegjs_code_422_3(iolist(), index()) -> parse_result().
+pegjs_code_422_3(Node, _Idx) ->
  [_, {_, Sequence}] = Node, iolist_to_binary(Sequence) .
 
--spec pegjs_code_421_1(iolist(), index()) -> parse_result().
-pegjs_code_421_1(Node, _Idx) ->
+-spec pegjs_code_424_1(iolist(), index()) -> parse_result().
+pegjs_code_424_1(Node, _Idx) ->
  text(Node) .
 
--spec pegjs_code_424_1(iolist(), index()) -> parse_result().
-pegjs_code_424_1(_Node, _Idx) ->
+-spec pegjs_code_427_1(iolist(), index()) -> parse_result().
+pegjs_code_427_1(_Node, _Idx) ->
  <<"">> .
 
--spec pegjs_code_427_3(iolist(), index()) -> parse_result().
-pegjs_code_427_3(_Node, _Idx) ->
+-spec pegjs_code_430_3(iolist(), index()) -> parse_result().
+pegjs_code_430_3(_Node, _Idx) ->
  <<"\0">> .
-
--spec pegjs_code_439_3(iolist(), index()) -> parse_result().
-pegjs_code_439_3(_Node, _Idx) ->
- <<"\b">>   .
-
--spec pegjs_code_440_3(iolist(), index()) -> parse_result().
-pegjs_code_440_3(_Node, _Idx) ->
- <<"\f">>   .
-
--spec pegjs_code_441_3(iolist(), index()) -> parse_result().
-pegjs_code_441_3(_Node, _Idx) ->
- <<"\n">>   .
 
 -spec pegjs_code_442_3(iolist(), index()) -> parse_result().
 pegjs_code_442_3(_Node, _Idx) ->
- <<"\r">>   .
+ <<"\b">>   .
 
 -spec pegjs_code_443_3(iolist(), index()) -> parse_result().
 pegjs_code_443_3(_Node, _Idx) ->
+ <<"\f">>   .
+
+-spec pegjs_code_444_3(iolist(), index()) -> parse_result().
+pegjs_code_444_3(_Node, _Idx) ->
+ <<"\n">>   .
+
+-spec pegjs_code_445_3(iolist(), index()) -> parse_result().
+pegjs_code_445_3(_Node, _Idx) ->
+ <<"\r">>   .
+
+-spec pegjs_code_446_3(iolist(), index()) -> parse_result().
+pegjs_code_446_3(_Node, _Idx) ->
  <<"\t">>   .
 
--spec pegjs_code_445_1(iolist(), index()) -> parse_result().
-pegjs_code_445_1(_Node, _Idx) ->
+-spec pegjs_code_448_1(iolist(), index()) -> parse_result().
+pegjs_code_448_1(_Node, _Idx) ->
  <<"\v">>   .
 
--spec pegjs_code_448_1(iolist(), index()) -> parse_result().
-pegjs_code_448_1(Node, _Idx) ->
+-spec pegjs_code_451_1(iolist(), index()) -> parse_result().
+pegjs_code_451_1(Node, _Idx) ->
  text(Node) .
 
--spec pegjs_code_460_1(iolist(), index()) -> parse_result().
-pegjs_code_460_1(Node, _Idx) ->
+-spec pegjs_code_463_1(iolist(), index()) -> parse_result().
+pegjs_code_463_1(Node, _Idx) ->
 
       [_, {_, Digits}] = Node,
-      hexstr_to_bin(binary_to_list(Digits))
+      hexstr_to_bin(Digits)
     .
 
--spec pegjs_code_466_1(iolist(), index()) -> parse_result().
-pegjs_code_466_1(Node, _Idx) ->
+-spec pegjs_code_469_1(iolist(), index()) -> parse_result().
+pegjs_code_469_1(Node, _Idx) ->
 
       [_, {_, Digits}] = Node,
-      hexstr_to_bin(binary_to_list(Digits))
+      hexstr_to_bin(Digits)
     .
-
--spec pegjs_code_475_1(iolist(), index()) -> parse_result().
-pegjs_code_475_1(_Node, _Idx) ->
- #entry{type = <<"any">>} .
 
 -spec pegjs_code_478_1(iolist(), index()) -> parse_result().
-pegjs_code_478_1(Node, _Idx) ->
+pegjs_code_478_1(_Node, _Idx) ->
+ #entry{type = <<"any">>} .
+
+-spec pegjs_code_481_1(iolist(), index()) -> parse_result().
+pegjs_code_481_1(Node, _Idx) ->
  [_, {_, Code}, _] = Node, Code .
 
 %% -type index() :: {{line, pos_integer()}, {column, pos_integer()}}.

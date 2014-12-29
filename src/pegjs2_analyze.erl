@@ -96,7 +96,7 @@ perform_analysis(#entry{ type = <<"action">>
                        , code = Code0
                        , index = Idx
                        }, #analysis{ code   = Codes0 } = Analysis) ->
-    case perform_code_analysis(Code0) of
+    case perform_code_analysis(Code0, Idx) of
       {error, _} = E -> E;
       {ok, F} ->
         Codes = dict:store(Idx, F, Codes0),
@@ -132,12 +132,16 @@ perform_analysis(#entry{ type = <<"rule_ref">>
              end,
   Analysis#analysis{required_rules = Required};
 perform_analysis(#entry{ type = Type
-                       , code = Code
+                       , code = Code0
                        , index = Idx
                        }, #analysis{code = Codes0} = Analysis) when Type =:= <<"semantic_and">>;
                                                                     Type =:= <<"semantic_not">>  ->
-  Codes = dict:store(Idx, Code, Codes0),
-  Analysis#analysis{code = Codes};
+    case perform_code_analysis(Code0, Idx) of
+      {error, _} = E -> E;
+      {ok, F} ->
+        Codes = dict:store(Idx, F, Codes0),
+        Analysis#analysis{code = Codes}
+    end;
 perform_analysis(#entry{ type = <<"literal">>
                        }, Analysis) ->
   Analysis;
@@ -196,6 +200,8 @@ is_combinator(Type) ->
                      , <<"optional">>
                      , <<"simple_not">>
                      , <<"simple_and">>
+                     , <<"semantic_not">>
+                     , <<"semantic_and">>
                      , <<"text">>
                      , <<"labeled">>
                      , <<"sequence">>
@@ -203,14 +209,18 @@ is_combinator(Type) ->
                      , <<"choice">>
                      , <<"named">>]).
 
--spec perform_code_analysis(binary()) ->
+-spec perform_code_analysis(binary(), index()) ->
   {ok, #function{}} | {error, term()}.
-perform_code_analysis(<<>>) ->
+perform_code_analysis(<<>>, _) ->
   {error, missing_action_code};
-perform_code_analysis([Code]) ->
+perform_code_analysis([Code], Index) ->
   case validate_code(Code) of
     {error, _} = E -> E;
-    {ok, Args}     -> {ok, #function{arg = Args, code= <<Code/binary, ".">>}}
+    {ok, Args}     -> {ok, #function{ arg = Args
+                                    , code= <<Code/binary, ".">>
+                                    , index = Index
+                                    }
+                      }
   end.
 
 -spec validate_code(binary()) -> {ok, list()} | {error, term()}.

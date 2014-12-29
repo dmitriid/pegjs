@@ -34,13 +34,16 @@ int(C) when $A =< C, C =< $F ->
 int(C) when $a =< C, C =< $f ->
     C - $a + 10.
 
-hexstr_to_bin(S) ->
-    unicode:characters_to_binary(hexstr_to_list(S)).
-
-hexstr_to_list([X,Y|T]) ->
-    [int(X)*16 + int(Y) | hexstr_to_list(T)];
-hexstr_to_list([]) ->
-    [].
+%% if it's in the form of \u00xx, skip the first two zeroes
+hexstr_to_bin(<<"0", "0", T/binary>>) ->
+    hexstr_to_bin(T);
+hexstr_to_bin(<<X/integer,Y/integer, T/binary>>) ->
+  Int = int(X)*16 + int(Y),
+  <<Int/integer
+  , (hexstr_to_bin(T))/binary
+  >>;
+hexstr_to_bin(<<>>) ->
+  <<>>.
 
 filter_empty_strings(Strings) ->
   filter_empty_strings(Strings, []).
@@ -109,7 +112,7 @@ Rule
                                 #entry{ type       = <<"named">>
                                       , name       = String
                                       , expression = entries(Expression)
-                                      , index       = Idx
+                                      , index      = Idx
                                       };
                               [] ->
                                 entries(Expression)
@@ -454,13 +457,13 @@ EscapeCharacter
 HexEscapeSequence
   = "x" digits:$(HexDigit HexDigit) {
       [_, {_, Digits}] = Node,
-      hexstr_to_bin(binary_to_list(Digits))
+      hexstr_to_bin(Digits)
     }
 
 UnicodeEscapeSequence
   = "u" digits:$(HexDigit HexDigit HexDigit HexDigit) {
       [_, {_, Digits}] = Node,
-      hexstr_to_bin(binary_to_list(Digits))
+      hexstr_to_bin(Digits)
     }
 
 DecimalDigit

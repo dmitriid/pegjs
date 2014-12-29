@@ -10,7 +10,7 @@
 %%% @author Dmitrii Dimandt <dmitrii@dmitriid.com>
 %%%
 %%%-----------------------------------------------------------------------------
--module(pegjs2_javascript_fn).
+-module(pegjs2_generate_functional).
 
 %%_* Exports ===================================================================
 -export([ generate/1
@@ -30,7 +30,9 @@
 generate(#analysis{ grammar = Grammar
                   %, combinators = Combinators
                   , options = Options
-                  , combinators = Combinators}) ->
+                  , combinators = Combinators
+                  , code = Code
+                  }) ->
   FileName = proplists:get_value(output, Options),
   file:delete(FileName),
   {ok, F} = file:open(FileName, [append]),
@@ -42,6 +44,7 @@ generate(#analysis{ grammar = Grammar
          , {fun generate_file_parse/2, [Grammar, Options]}
          , {fun generate_rules/1, [Grammar]}
          , {fun generate_combinators/1, [Combinators]}
+         , {fun generate_functions/1, [Code]}
 %%          , {fun emit/1, [Grammar]}
 %%          , {fun code_for/1, [Combinators]}
          ]),
@@ -61,7 +64,7 @@ generate_rules([]) ->
   <<>>.
 
 generate_rule(#entry{ name = Name
-                    , expression = [Expression]}) ->
+                    , expression = Expression}) ->
   <<"pegjs_rule('", Name/binary, "', Node) -> \n"
   , "  pegjs( Node\n"
   , "       , '", Name/binary, "'\n"
@@ -72,24 +75,24 @@ generate_rule(#entry{ name = Name
   >>.
 
 generate_combinator_call(#entry{type = <<"any">>}) ->
-  <<"any()">>;
+  <<"pegjs_combinator_any()">>;
 generate_combinator_call(#entry{ type = <<"choice">>
                                , alternatives = Elements}) ->
-  <<"choice(["
+  <<"pegjs_combinator_choice(["
   , (generate_combinator_list(Elements))/binary
   , "])">>;
 generate_combinator_call(#entry{ type = <<"sequence">>
                                , elements = Elements}) ->
-  <<"sequence(["
+  <<"pegjs_combinator_sequence(["
   , (generate_combinator_list(Elements))/binary
   , "])">>;
 generate_combinator_call(#entry{ type = <<"literal">>
                                , value = Text
                                , ignore_case = IgnoreCase}) ->
-  Chars0 = unicode:characters_to_list(iolist_to_binary(Text)),
-  Chars = io_lib:format("~p", [Chars0]),
-  <<"literal("
-  , "unicode:characters_to_binary(", (iolist_to_binary(Chars))/binary, "), "
+  Chars0 = iolist_to_binary(Text),
+  Chars = list_of_ints_to_binary(Chars0),
+  <<"pegjs_combinator_literal("
+  , Chars/binary, ", "
   , (atom_to_binary(IgnoreCase, latin1))/binary
   , ")">>;
 generate_combinator_call(#entry{ type = <<"class">>
@@ -104,46 +107,65 @@ generate_combinator_call(#entry{ type = <<"class">>
       , (pegjs_util:escape_for_regex(B2))/binary
       >>
   end, Parts),
-  Ps = iolist_to_binary([<<"^[">>
-                        , case Inverted of true -> <<"^">>; false -> <<>> end
-                        , Ps0
-                        , <<"]">>
-                        ]),
-  Chars0 = unicode:characters_to_list(Ps),
-  Chars = io_lib:format("~p", [Chars0]),
-  <<"regexp("
-  , "unicode:characters_to_binary(", (iolist_to_binary(Chars))/binary, "), "
+  Ps1 = << <<Part/binary>> || Part <- Ps0>>,
+  Ps = <<"^["
+       , (case Inverted of true -> <<"^">>; false -> <<"">> end)/binary
+       , Ps1/binary
+       , "]">>,
+  Chars = list_of_ints_to_binary(Ps),
+  <<"pegjs_combinator_regexp("
+  , (iolist_to_binary(Chars))/binary, ", "
   , (atom_to_binary(IgnoreCase, latin1))/binary
   , ")">>;
 generate_combinator_call(#entry{ type = <<"rule_ref">>
                                , name = Name}) ->
-  <<"rule_ref('", Name/binary, "')">>;
+  <<"pegjs_combinator_rule_ref('", Name/binary, "')">>;
 generate_combinator_call(#entry{ type = Type
-                               , expression = [Expression]})
+                               , expression = Expression})
   when Type =:= <<"zero_or_more">>
      ; Type =:= <<"one_or_more">>
      ; Type =:= <<"optional">>   ->
-  <<"suffixed('", Type/binary, "', "
+  <<"pegjs_combinator_suffixed('", Type/binary, "', "
   , (generate_combinator_call(Expression))/binary
   ,")">>;
 generate_combinator_call(#entry{ type = Type
-                               , expression = [Expression]})
+                               , expression = Expression})
   when Type =:= <<"simple_and">>
      ; Type =:= <<"simple_not">> ->
-  <<"prefixed('", Type/binary, "', "
+  <<"pegjs_combinator_prefixed('", Type/binary, "', "
   , (generate_combinator_call(Expression))/binary
   ,")">>;
 generate_combinator_call(#entry{ type = <<"text">>
-                               , expression = [Expression]}) ->
-  <<"text("
+                               , expression = Expression}) ->
+  <<"pegjs_combinator_text("
   , (generate_combinator_call(Expression))/binary
   ,")">>;
 generate_combinator_call(#entry{ type = <<"labeled">>
                                , label = Label
-                               , expression = [Expression]}) ->
-  <<"labeled(<<\"", Label/binary, "\">>, "
+                               , expression = Expression}) ->
+  <<"pegjs_combinator_labeled(<<\"", Label/binary, "\">>, "
   , (generate_combinator_call(Expression))/binary
-  ,")">>.
+  ,")">>;
+generate_combinator_call(#entry{ type = <<"action">>
+                               , expression = Expression
+                               , index = Index}) ->
+  <<"pegjs_combinator_action(", (generate_function_call(Index))/binary, ", "
+  , (generate_combinator_call(Expression))/binary
+  ,")">>;
+generate_combinator_call(#entry{ type = Type
+                               , index = Index})
+  when Type =:= <<"semantic_and">>
+     ; Type =:= <<"semantic_not">> ->
+  <<"pegjs_combinator_prefixed('", Type/binary, "', "
+  , (generate_function_call(Index))/binary
+  ,")">>;
+generate_combinator_call(#entry{ type = <<"named">>
+                               , expression = Expression}) ->
+  <<"pegjs_combinator_named("
+  , (generate_combinator_call(Expression))/binary
+  ,")">>;
+generate_combinator_call([Entry|[]]) ->
+  generate_combinator_call(Entry).
 
 
 generate_combinator_list([]) ->
@@ -154,6 +176,10 @@ generate_combinator_list([H | T]) ->
   <<(generate_combinator_call(H))/binary
   , ", "
   , (generate_combinator_list(T))/binary>>.
+
+generate_function_call(Index) ->
+  <<"fun ", (generate_function_name(Index))/binary
+  , "/1">>.
 
 %% emit(#entry{ type = <<"grammar">>
 %%            , rules = Rules
@@ -274,3 +300,41 @@ generate_combinators(Required, Existing) ->
                      [Code, MoreCode | Acc]
                    end, [], Required),
   {ok, lists:usort(Cs)}.
+
+generate_functions(Funs) ->
+  R = lists:foldl(fun({_, #function{ arg   = Arg
+                                   , code  = Code
+                                   , index = Index}}, Acc) ->
+                    FName = generate_function_name(Index),
+                    F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
+                        , FName/binary, "(", Arg/binary, ") -> \n"
+                        , Code/binary
+                        , "\n\n"
+                        >>,
+                    <<Acc/binary, F/binary>>
+                end, <<>>, dict:to_list(Funs)),
+  {ok, R}.
+
+generate_function_name({{line, Line}, {column, Column}}) ->
+ <<"pegjs_custom_fun_"
+ , (list_to_binary(integer_to_list(Line)))/binary
+ , "_"
+ , (list_to_binary(integer_to_list(Column)))/binary
+ >>.
+
+list_of_ints_to_binary(Ints) ->
+  <<"<<", (to_list_of_ints(Ints))/binary, ">>">>.
+
+to_list_of_ints(<<>>) ->
+  <<>>;
+to_list_of_ints(<<I/integer, R/binary>>) when R =:= <<>> ->
+  <<(int_to_binary(I))/binary>>;
+to_list_of_ints(<<I/integer, H/binary>>) ->
+  <<(int_to_binary(I))/binary
+  , ","
+  , (to_list_of_ints(H))/binary>>.
+
+%% Accomodates earlier versions of Erlang which don't have
+%% integer_to_binary/1
+int_to_binary(I) ->
+  list_to_binary(integer_to_list(I)).

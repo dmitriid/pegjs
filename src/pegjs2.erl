@@ -57,10 +57,10 @@ file(FileName, Options) ->
 -spec compile(Options::proplists:proplist()) -> ok | {error, term()}.
 compile(Options) ->
   pegjs_util:chain( [ fun pegjs2_analyze:analyze/1
-%%                     , fun pegjs2_analyze:report_missing_rules/1
+                    , fun pegjs2_analyze:report_missing_rules/1
 %%                     , fun pegjs2_analyze:report_left_recursion/1
 %%                     , fun pegjs2_analyze:remove_proxy_rules/1
 %%                     , fun pegjs2_bytecode:generate/1
-                    , fun pegjs2_javascript_fn:generate/1
+                    , fun pegjs2_generate_functional:generate/1
                     ]
                    , Options).

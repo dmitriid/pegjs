@@ -71,24 +71,6 @@ memo_table_name() ->
 
 %%_* Implemented combinators ===================================================
 
-%pegjs_combinator('prefixed', {semantic_and, _}, TransformFun) ->
-%  fun(#pegjs_node{input = Input, index = Index} = Node) ->
-%    case TransformFun(Node) of
-%      {error, Reason} -> {error, {Reason, Index}};
-%      _ -> {[], Node}
-%    end
-%  end;
-%pegjs_combinator('prefixed', {semantic_not, _}, TransformFun) ->
-%  fun(#pegjs_node{input = Input, index = Index} = Node) ->
-%    case TransformFun(Node) of
-%      {error, _} -> {[], Node};
-%      Result -> {error, {expected, {no_match, Result}, Index}}
-%    end
-%  end;
-
-%pegjs_combinator(Name, _, _) ->
-%  {error, {invalid_combinator, Name}}.
-
 p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
   lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
 p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters

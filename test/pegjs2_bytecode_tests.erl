@@ -92,7 +92,7 @@ bytecode_test_() ->
               , #entry{ type = <<"literal">>
                       , value = <<"a">>
                       , description = <<"\\\"a\\\"">>}
-              , {function, [], [<<" code ">>]}
+              , {function, [], <<" code ">>}
               ]
             )
   , run_test( "for action, with one label"
@@ -109,7 +109,7 @@ bytecode_test_() ->
               , #entry{ type = <<"literal">>
                       , value = <<"a">>
                       , description = <<"\\\"a\\\"">>}
-              , {function, [<<"a">>], [<<" code ">>]}
+              , {function, [<<"a">>], <<" code ">>}
               ]
             )
   , run_test( "for action, with multiple labels"
@@ -148,7 +148,7 @@ bytecode_test_() ->
               , #entry{ type = <<"literal">>
                       , value = <<"c">>
                       , description = <<"\\\"c\\\"">>}
-              , {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
+              , {function, [<<"a">>, <<"b">>, <<"c">>], <<" code ">>}
               ]
             )
   , run_test( "for sequence"
@@ -311,7 +311,7 @@ bytecode_test_() ->
                     28             %%      PUSH_FAILED
               ]
             , [
-                {function, [], [<<" code ">>]}
+                {function, [], <<" code ">>}
               ]
             )
   , run_test( "for semantic_and, with labels"
@@ -354,7 +354,7 @@ bytecode_test_() ->
                 #entry{type = <<"literal">>, value = <<"b">>, description = <<"\\\"b\\\"">>},
                 <<"c">>,
                 #entry{type = <<"literal">>, value = <<"c">>, description = <<"\\\"c\\\"">>},
-                {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
+                {function, [<<"a">>, <<"b">>, <<"c">>], <<" code ">>}
               ]
             )
     , run_test( "for semantic_not, without labels"
@@ -369,7 +369,7 @@ bytecode_test_() ->
                   26             %%      PUSH_UNDEFINED
                 ]
               , [
-                  {function, [], [<<" code ">>]}
+                  {function, [], <<" code ">>}
                 ]
               )
     , run_test( "for semantic_not, with labels"
@@ -418,7 +418,7 @@ bytecode_test_() ->
                   #entry{ type = <<"literal">>
                         , value = <<"c">>
                         , description = <<"\\\"c\\\"">>},
-                  {function, [<<"a">>, <<"b">>, <<"c">>], [<<" code ">>]}
+                  {function, [<<"a">>, <<"b">>, <<"c">>], <<" code ">>}
                 ]
               )
     , run_test( "for rule_ref"

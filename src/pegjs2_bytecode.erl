@@ -414,9 +414,9 @@ generate( #entry{ type = <<"class">>
       {[], true}  -> <<"^[\\S\\s]">>;
       {[], false} -> <<"^(?!)">>;
       {_, _} ->
-        Ps = lists:map(fun([B]) when is_binary(B) ->
+        Ps = lists:map(fun(B) when is_binary(B) ->
                             escape_for_regexp_class(B);
-                          ([[B1, B2]]) ->
+                          ([B1, B2]) ->
                             << (escape_for_regexp_class(B1))/binary
                             , "-"
                             , (escape_for_regexp_class(B2))/binary

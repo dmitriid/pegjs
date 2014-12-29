@@ -45,8 +45,6 @@ generate(#analysis{ grammar = Grammar
          , {fun generate_rules/1, [Grammar]}
          , {fun generate_combinators/1, [Combinators]}
          , {fun generate_functions/1, [Code]}
-%%          , {fun emit/1, [Grammar]}
-%%          , {fun code_for/1, [Combinators]}
          ]),
   file:close(F), ok.
 
@@ -92,21 +90,21 @@ generate_combinator_call(#entry{ type = <<"literal">>
   Chars0 = iolist_to_binary(Text),
   Chars = list_of_ints_to_binary(Chars0),
   <<"pegjs_combinator_literal("
-  , Chars/binary, ", "
+  , "", Chars/binary, ", "
   , (atom_to_binary(IgnoreCase, latin1))/binary
   , ")">>;
 generate_combinator_call(#entry{ type = <<"class">>
                                , parts = Parts
                                , ignore_case = IgnoreCase
                                , inverted = Inverted}) ->
-  Ps0 = lists:map(fun([B]) when is_binary(B) ->
-    pegjs_util:escape_for_regex(B);
-    ([[B1, B2]]) ->
-      << (pegjs_util:escape_for_regex(B1))/binary
-      , "-"
-      , (pegjs_util:escape_for_regex(B2))/binary
-      >>
-  end, Parts),
+  Ps0 = lists:map(fun(B) when is_binary(B) ->
+                      pegjs_util:escape_for_regex(B);
+                    ([B1, B2]) ->
+                      << (pegjs_util:escape_for_regex(B1))/binary
+                      , "-"
+                      , (pegjs_util:escape_for_regex(B2))/binary
+                      >>
+                  end, Parts),
   Ps1 = << <<Part/binary>> || Part <- Ps0>>,
   Ps = <<"^["
        , (case Inverted of true -> <<"^">>; false -> <<"">> end)/binary
@@ -114,7 +112,7 @@ generate_combinator_call(#entry{ type = <<"class">>
        , "]">>,
   Chars = list_of_ints_to_binary(Ps),
   <<"pegjs_combinator_regexp("
-  , (iolist_to_binary(Chars))/binary, ", "
+  , "", (iolist_to_binary(Chars))/binary, ", "
   , (atom_to_binary(IgnoreCase, latin1))/binary
   , ")">>;
 generate_combinator_call(#entry{ type = <<"rule_ref">>
@@ -180,42 +178,6 @@ generate_combinator_list([H | T]) ->
 generate_function_call(Index) ->
   <<"fun ", (generate_function_name(Index))/binary
   , "/1">>.
-
-%% emit(#entry{ type = <<"grammar">>
-%%            , rules = Rules
-%%            }) ->
-%%   RuleDefs = dict:new(),
-%%   R = lists:foldl(fun(#entry{name = Name} = Entry, Acc) ->
-%%                 dict:store(Name, emit(Entry), Acc)
-%%               end, RuleDefs, Rules),
-%%   {ok, [C || {_, C} <- dict:to_list(R)]};
-%% emit(#entry{ type = <<"rule">>
-%%            , name = Name
-%%            , expression = [Expression]}) ->
-%%   E = emit(Expression),
-%%   <<"'", Name/binary, "'(Input, Index) -> \n"
-%%   , E/binary, ".\n\n">>;
-%% emit(#entry{type = <<"any">>}) ->
-%%   <<"any(Input, Index)">>;
-%% emit(_) ->
-%%   "".
-%%
-%% code_for(Combinators) ->
-%%   {ok,
-%%   lists:foldl(fun({Combinator, _}, Acc) ->
-%%              [generate_code_for(Combinator) | Acc]
-%%             end, [], dict:to_list(Combinators))}.
-%%
-%% generate_code_for(<<"any">>) ->
-%%   <<"ch(Input, State) ->\n"
-%%   , "  Pos = pos(State),\n"
-%%   , "  case Pos > length(Input) of\n"
-%%   , "    true  -> failed(?ANY, ?EOI);\n"
-%%   , "    false -> get_input(Input, Pos + 1)\n"
-%%   , "  end.\n\n">>;
-%% generate_code_for(C) ->
-%%   io:format("~p~n", [C]),
-%%   [].
 
 %%_* Helpers ===================================================================
 write(File, FunList) ->
@@ -309,7 +271,7 @@ generate_functions(Funs) ->
                     F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
                         , FName/binary, "(", Arg/binary, ") -> \n"
                         , Code/binary
-                        , "\n\n"
+                        , ".\n\n"
                         >>,
                     <<Acc/binary, F/binary>>
                 end, <<>>, dict:to_list(Funs)),

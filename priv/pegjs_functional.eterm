@@ -106,8 +106,7 @@
 }.
 
 {<<"regexp">>, [],
-<<"pegjs_combinator_regexp(Regexp0, IsIgnoreCase) ->\n"
-, "    Regexp = unicode:characters_to_binary(Regexp0),\n"
+<<"pegjs_combinator_regexp(Regexp, IsIgnoreCase) ->\n"
 , "    Options0 = [unicode, dotall, anchored],\n"
 , "    Options = case IsIgnoreCase of\n"
 , "                true  -> [caseless | Options0];\n"
@@ -266,11 +265,15 @@
 
 {<<"action">>, []
 , <<"pegjs_combinator_action(CustomFun, P) ->\n"
-  , "  io:format(\"P ~p~n\", [erlang:fun_info(P)]),\n"
   , "  fun(Node0) ->\n"
   , "    case P(Node0) of\n"
   , "      {error, _} = E -> E;\n"
-  , "      Node           -> CustomFun(Node)\n"
+  , "      Node           ->\n"
+  , "        case CustomFun(Node) of\n"
+  , "          #pegjs_node{} = Match -> Match;\n"
+  , "          {error, _} = E        -> E;\n"
+  , "          Other                 -> Node#pegjs_node{match = Other}"
+  , "        end\n"
   , "    end\n"
   , "  end.\n\n"
   >>

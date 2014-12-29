@@ -1,17 +1,15 @@
-additive = multitive "+" additive      { [A, <<"+">>, B] = Node, A + B }
-         / multitive                   { [M] = Node, M }
+additive = multitive "+" additive      { [A, _, B] = match(Node), A + B }
+         / multitive
 
-multitive = primary "*" Mul:multitive  { [A, <<"*">>, {<<"Mul">>, B}] = Node, A * B }
-          / primary                    { [P] = Node, P }
+multitive = primary "*" Mul:multitive  { [A, _, {<<"Mul">>, B}] = match(Node), A * B }
+          / primary
 
-primary   = par:("(" add:additive ")") { [{<<"par">>,List}] = Node,
-                                         [_, {<<"add">>, Value}, _] = List,
-                                         Value
+primary   = par:("(" add:additive ")") { Par = value(<<"par">>, Node),
+                                         value(<<"add">>, Par)
                                        }
-          / dec:decimal                { [{<<"dec">>,Int}] = Node, Int }
+          / dec:decimal                { value(<<"dec">>, Node) }
 
 decimal   = [0-9]+
-            { [Ints] = Node,
-              List = lists:flatten([binary_to_list(B) || B <- Ints]),
-              list_to_integer(List)
+            { Ints = text(Node),
+              list_to_integer(binary_to_list(Ints))
             }

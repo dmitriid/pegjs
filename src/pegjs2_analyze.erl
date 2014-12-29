@@ -67,8 +67,10 @@ analyze(Grammar, Options) ->
 perform_analysis([], Analysis) ->
   Analysis;
 perform_analysis([H|T], Analysis0) ->
-  Analysis = perform_analysis(H, Analysis0),
-  perform_analysis(T, Analysis);
+  case perform_analysis(H, Analysis0) of
+    {error, _} = E -> E;
+    Analysis       -> perform_analysis(T, Analysis)
+  end;
 perform_analysis(#entry{ type = <<"grammar">>
                        , initializer = Initializer
                        , rules = Rules
@@ -211,16 +213,20 @@ is_combinator(Type) ->
 
 -spec perform_code_analysis(binary(), index()) ->
   {ok, #function{}} | {error, term()}.
-perform_code_analysis(<<>>, _) ->
-  {error, missing_action_code};
-perform_code_analysis([Code], Index) ->
+perform_code_analysis(<<>>, Index) ->
+  {error, {missing_action_code, Index}};
+perform_code_analysis(Code0, Index) ->
+  Code = case Code0 of
+           [C] -> C;
+           C -> C
+         end,
   case validate_code(Code) of
-    {error, _} = E -> E;
-    {ok, Args}     -> {ok, #function{ arg = Args
-                                    , code= <<Code/binary, ".">>
-                                    , index = Index
-                                    }
-                      }
+    {error, Reason} -> {error, {Reason, Index}};
+    {ok, Args}      -> {ok, #function{ arg   = Args
+                                     , code  = Code
+                                     , index = Index
+                                     }
+                       }
   end.
 
 -spec validate_code(binary()) -> {ok, list()} | {error, term()}.

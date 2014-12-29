@@ -36,12 +36,14 @@ int(C) when $a =< C, C =< $f ->
 
 %% if it's in the form of \u00xx, skip the first two zeroes
 hexstr_to_bin(<<"0", "0", T/binary>>) ->
-    hexstr_to_bin(T);
-hexstr_to_bin(<<X/integer,Y/integer, T/binary>>) ->
-  Int = int(X)*16 + int(Y),
-  <<Int/integer
-  , (hexstr_to_bin(T))/binary
-  >>;
+  hexstr_to_bin(T);
+hexstr_to_bin(<<D1/integer, D2/integer, D3/integer, D4/integer>>) ->
+  Int = int(D1)*4096 + int(D2)*256 + int(D3)*16 + int(D4),
+  unicode:characters_to_binary([Int]);
+hexstr_to_bin(<<D1/integer, D2/integer>>) ->
+  Int = int(D1) * 16 + int(D2),
+  Codepoints = [Int],
+  unicode:characters_to_binary(Codepoints);
 hexstr_to_bin(<<>>) ->
   <<>>.
 
@@ -56,12 +58,6 @@ filter_empty_strings(<<>>, Acc) ->
   lists:reverse(Acc);
 filter_empty_strings(Binary, _) when is_binary(Binary) ->
   Binary.
-
-text(Node) ->
-  TextNode = [T || Match <- Node
-                 , T <- case Match of {_, Part} -> [Part]; Part -> [Part] end
-             ],
-  iolist_to_binary(TextNode).
 
 entries(#entry{} = E) ->
   E;
@@ -87,16 +83,17 @@ ops_to_semantic_predicate_types(<<"!">>) -> <<"semantic_not">>.
 
 Grammar
   = __ initializer:(Initializer __)? rules:(Rule __)+ {
-      [_, {_, Initializer}, {_, Rules}] = Node,
+      Initializer = value(<<"initializer">>, Node),
+      Rules       = value(<<"rules">>, Node),
       #entry{ type        = <<"grammar">>
             , initializer = case Initializer of [I, _] -> I; [] -> [] end
             , rules       = entries(Rules)
-            , index       = Idx
+            , index       = index(Node)
             }
     }
 
 Initializer
-  = code:CodeBlock EOS { [{_, Code}, _] = Node, #entry{type = <<"initializer">>, code = Code, index = Idx} }
+  = code:CodeBlock EOS { Code = value(<<"code">>, Node), #entry{type = <<"initializer">>, code = Code, index = index(Node)} }
 
 Rule
   = name:IdentifierName __
@@ -104,7 +101,9 @@ Rule
     "=" __
     expression:Expression EOS
     {
-      [{_, Name}, _, {_, DisplayName}, _, _, {_, Expression}, _] = Node,
+      Name         = value(<<"name">>, Node),
+      DisplayName  = value(<<"displayName">>, Node),
+      Expression   = value(<<"expression">>, Node),
       #entry{ type = <<"rule">>
             , name = Name
             , expression = case DisplayName of
@@ -112,12 +111,12 @@ Rule
                                 #entry{ type       = <<"named">>
                                       , name       = String
                                       , expression = entries(Expression)
-                                      , index      = Idx
+                                      , index      = index(Node)
                                       };
                               [] ->
                                 entries(Expression)
                            end
-            , index = Idx
+            , index = index(Node)
             }
     }
 
@@ -126,21 +125,23 @@ Expression
 
 ChoiceExpression
   = first:ActionExpression rest:(__ "/" __ ActionExpression)* {
-      [{_, First}, {_, Rest}] = Node,
+      First = value(<<"first">>, Node),
+      Rest  = value(<<"rest">>, Node),
       case Rest of
         [] ->
           entries(First);
         _ ->
           #entry{ type         = <<"choice">>
                 , alternatives = entries([First | Rest])
-                , index       = Idx
+                , index       = index(Node)
                 }
       end
     }
 
 ActionExpression
   = expression:SequenceExpression code:(__ CodeBlock)? {
-      [{_, Expression}, {_, Code}] = Node,
+      Expression = value(<<"expression">>, Node),
+      Code = value(<<"code">>, Node),
       case Code of
         [] ->
           entries(Expression);
@@ -148,42 +149,45 @@ ActionExpression
           #entry{ type       = <<"action">>
                 , expression = entries(Expression)
                 , code       = C
-                , index       = Idx
+                , index      = index(Node)
                 }
       end
     }
 
 SequenceExpression
   = first:LabeledExpression rest:(__ LabeledExpression)* {
-      [{_, First}, {_, Rest}] = Node,
+      First = value(<<"first">>, Node),
+      Rest  = value(<<"rest">>, Node),
       case Rest of
         [] ->
           entries(First);
         _ ->
           #entry{ type     = <<"sequence">>
                 , elements = entries([First | Rest])
-                , index       = Idx
+                , index    = index(Node)
                 }
       end
     }
 
 LabeledExpression
   = label:Identifier __ ":" __ expression:PrefixedExpression {
-      [{_, Label}, _, _, _, {_, Expression}] = Node,
+      Label      = value(<<"label">>, Node),
+      Expression = value(<<"expression">>, Node),
       #entry{ type       = <<"labeled">>
             , label      = Label
             , expression = entries(Expression)
-            , index       = Idx
+            , index      = index(Node)
             }
     }
   / PrefixedExpression
 
 PrefixedExpression
   = operator:PrefixedOperator __ expression:SuffixedExpression {
-      [{_, Operator}, _, {_, Expression}] = Node,
+      Operator   = value(<<"operator">>, Node),
+      Expression = value(<<"expression">>, Node),
       #entry{ type       = ops_to_prefixed_types(Operator)
             , expression = entries(Expression)
-            , index       = Idx
+            , index      = index(Node)
             }
     }
   / SuffixedExpression
@@ -195,10 +199,11 @@ PrefixedOperator
 
 SuffixedExpression
   = expression:PrimaryExpression __ operator:SuffixedOperator {
-      [{_, Expression}, _, {_, Operator}] = Node,
+      Operator   = value(<<"operator">>, Node),
+      Expression = value(<<"expression">>, Node),
       #entry{ type       = ops_to_suffixed_types(Operator)
             , expression = entries(Expression)
-            , index       = Idx
+            , index      = index(Node)
             }
     }
   / PrimaryExpression
@@ -214,23 +219,23 @@ PrimaryExpression
   / AnyMatcher
   / RuleReferenceExpression
   / SemanticPredicateExpression
-  / "(" __ expression:Expression __ ")" { [_, _, {_, Expression}, _, _] = Node, Expression }
+  / "(" __ expression:Expression __ ")" { value(<<"expression">>, Node) }
 
 RuleReferenceExpression
   = name:IdentifierName !(__ (StringLiteral __)? "=") {
-      [{_, Name}, _] = Node,
       #entry{ type  = <<"rule_ref">>
-            , name  = Name
-            , index = Idx
+            , name  = value(<<"name">>, Node)
+            , index = index(Node)
             }
     }
 
 SemanticPredicateExpression
   = operator:SemanticPredicateOperator __ code:CodeBlock {
-      [{_, Operator}, _, {_, Code}] = Node,
+      Operator = value(<<"operator">>, Node),
+      Code     = value(<<"code">>, Node),
       #entry{ type  = ops_to_semantic_predicate_types(Operator)
             , code  = Code
-            , index = Idx
+            , index = index(Node)
             }
     }
 
@@ -276,16 +281,16 @@ SingleLineComment
   = "//" (!LineTerminator SourceCharacter)*
 
 Identifier
-  = !ReservedWord name:IdentifierName { [_, {_, Name}] = Node, Name }
+  = !ReservedWord name:IdentifierName { value(<<"name">>, Node) }
 
 IdentifierName "identifier"
-  = first:IdentifierStart rest:IdentifierPart* { [{_, First}, {_, Rest}] = Node, iolist_to_binary([First, Rest]) }
+  = first:IdentifierStart rest:IdentifierPart* { iolist_to_binary([value(<<"first">>, Node), value(<<"rest">>, Node)]) }
 
 IdentifierStart
   = UnicodeLetter
   / "$"
   / "_"
-  / "\\" sequence:UnicodeEscapeSequence { [_, {_, Sequence}] = Node, Sequence }
+  / "\\" sequence:UnicodeEscapeSequence { value(<<"sequence">>, Node) }
 
 IdentifierPart
   = IdentifierStart
@@ -365,26 +370,25 @@ BooleanLiteral
 
 LiteralMatcher "literal"
   = value:StringLiteral ignoreCase:"i"? {
-      [{_, Value}, {_, IgnoreCase}] = Node,
       #entry{ type        = <<"literal">>
-            , value       = Value
-            , ignore_case = IgnoreCase /= []
-            , index       = Idx
+            , value       = value(<<"value">>, Node)
+            , ignore_case = value(<<"ignoreCase">>, Node) /= []
+            , index       = index(Node)
             }
     }
 
 StringLiteral "string"
-  = '"' chars:DoubleStringCharacter* '"' { [_, {_, Chars}, _] = Node, iolist_to_binary(Chars) }
-  / "'" chars:SingleStringCharacter* "'" { [_, {_, Chars}, _] = Node, iolist_to_binary(Chars) }
+  = '"' chars:DoubleStringCharacter* '"' { iolist_to_binary(value(<<"chars">>, Node)) }
+  / "'" chars:SingleStringCharacter* "'" { iolist_to_binary(value(<<"chars">>, Node)) }
 
 DoubleStringCharacter
   = !('"' / "\\" / LineTerminator) SourceCharacter { text(Node) }
-  / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, Sequence }
+  / "\\" sequence:EscapeSequence { value(<<"sequence">>, Node) }
   / LineContinuation
 
 SingleStringCharacter
   = !("'" / "\\" / LineTerminator) SourceCharacter { text(Node) }
-  / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, Sequence }
+  / "\\" sequence:EscapeSequence { value(<<"sequence">>, Node) }
   / LineContinuation
 
 CharacterClassMatcher "character class"
@@ -394,23 +398,26 @@ CharacterClassMatcher "character class"
     "]"
     ignoreCase:"i"?
     {
-      [_, {_, Inverted}, {_, Parts0}, _, {_, IgnoreCase}] = Node,
-      Parts = filter_empty_strings(Parts0),
+      Inverted   = value(<<"inverted">>, Node),
+      IgnoreCase = value(<<"ignoreCase">>, Node),
+      Parts0     = value(<<"parts">>, Node),
+      Parts      = filter_empty_strings(Parts0),
       #entry{ type        = <<"class">>
             , parts       = Parts
             , inverted    = Inverted /= []
             , ignore_case = IgnoreCase /= []
             , raw_text    = text(Node)
-            , index       = Idx
+            , index       = index(Node)
             }
     }
 
 ClassCharacterRange
   = begin:ClassCharacter "-" end:ClassCharacter {
-      [{_, Begin}, _, {_, End}] = Node,
+      Begin = value(<<"begin">>, Node),
+      End   = value(<<"end">>, Node),
       case Begin > End of
         true ->
-          error({invalid_character_range, {Begin, End, Idx}});
+          error({invalid_character_range, {Begin, End, index(Node)}});
         false ->
           [Begin, End]
       end
@@ -418,7 +425,7 @@ ClassCharacterRange
 
 ClassCharacter
   = !("]" / "\\" / LineTerminator) SourceCharacter { text(Node) }
-  / "\\" sequence:EscapeSequence { [_, {_, Sequence}] = Node, iolist_to_binary(Sequence) }
+  / "\\" sequence:EscapeSequence { iolist_to_binary(value(<<"sequence">>, Node)) }
   / LineContinuation { text(Node) }
 
 LineContinuation
@@ -456,14 +463,12 @@ EscapeCharacter
 
 HexEscapeSequence
   = "x" digits:$(HexDigit HexDigit) {
-      [_, {_, Digits}] = Node,
-      hexstr_to_bin(Digits)
+      hexstr_to_bin(value(<<"digits">>, Node))
     }
 
 UnicodeEscapeSequence
   = "u" digits:$(HexDigit HexDigit HexDigit HexDigit) {
-      [_, {_, Digits}] = Node,
-      hexstr_to_bin(Digits)
+      hexstr_to_bin(value(<<"digits">>, Node))
     }
 
 DecimalDigit
@@ -476,7 +481,7 @@ AnyMatcher
   = "." { #entry{type = <<"any">>} }
 
 CodeBlock "code block"
-  = "{" code:Code "}" { [_, {_, Code}, _] = Node, Code }
+  = "{" code:Code "}" { value(<<"code">>, Node) }
 
 Code
   = $((![{}] SourceCharacter)+ / "{" Code "}")*

@@ -1,8 +1,5 @@
-%% -type index() :: {{line, pos_integer()}, {column, pos_integer()}}.
--type input() :: binary().
--ifndef(index).
 -type index() :: {{line, integer()}, {column, integer()}}.
--endif.
+-type input() :: binary().
 -type parse_failure() :: {error, term()}.
 -type parse_success() :: {term(), input(), index()}.
 -type parse_result() :: parse_failure() | parse_success().
@@ -32,7 +29,8 @@ pegjs(#pegjs_node{index = StartIndex} = Node, Name, ParseFun) ->
         #pegjs_node{} = Match ->                     % If it passes, transform and memoize the result.
           % Transformed = TransformFun(Match, StartIndex),
           %{Transformed, InpRem, NewIndex}
-          Match
+          Match;
+        Other -> match(Other, Node)                  % for convenience, just return a match, no the full node
       end,
       memoize(StartIndex, Name, Result),
       Result
@@ -83,10 +81,25 @@ p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single c
 match(#pegjs_node{match = Match}) -> Match;
 match(Other)                      -> Other.
 
+match(New, Node)                  -> Node#pegjs_node{match = New}.
+
 index(#pegjs_node{index = Index}) -> Index;
 index(Other)                      -> Other.
 
 input(#pegjs_node{input = Input}) -> Input;
 input(Other)                      -> Other.
 
+value(Label, #pegjs_node{match = Match}) ->
+  value(Label, Match);
+value(Label, {Label, Value}) -> Value;
+value(Label, List) when is_list(List) ->
+  case lists:keyfind(Label, 1, List) of
+    {_, Value} -> Value;
+    false      -> undefined
+  end.
 
+text(Node) ->
+  TextNode = [T || Match <- match(Node)
+                 , T <- case Match of {_, Part} -> [Part]; Part -> [Part] end
+             ],
+  iolist_to_binary(TextNode).

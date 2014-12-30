@@ -98,8 +98,11 @@ value(Label, List) when is_list(List) ->
     false      -> undefined
   end.
 
-text(Node) ->
-  TextNode = [T || Match <- match(Node)
-                 , T <- case Match of {_, Part} -> [Part]; Part -> [Part] end
-             ],
-  iolist_to_binary(TextNode).
+text(#pegjs_node{} = Node) ->
+  iolist_to_binary(text(match(Node)));
+text(B) when is_binary(B) ->
+  B;
+text({_, Value}) ->  %% labels
+  text(Value);
+text(List) when is_list(List) ->
+  [text(E) || E <- List].

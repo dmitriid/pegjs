@@ -204,7 +204,7 @@ generate_exports(_Options) ->
   >>}.
 
 generate_template(_Options) ->
-  file:read_file(filename:join([code:priv_dir(pegjs), "pegjs2_fn.template"])).
+  file:read_file(filename:join([code:priv_dir(pegjs), "pegjs2_functional.template"])).
 
 generate_file_parse(#entry{rules = [H|_]}, Options) ->
   Root = case proplists:get_value(starte_rule, Options) of

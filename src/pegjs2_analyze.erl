@@ -344,9 +344,8 @@ detect_proxy_rules(#entry{ type = <<"grammar">>
 
 -spec detect_proxy_rule(#entry{}, list()) -> list().
 detect_proxy_rule(#entry{ name = ParentName
-                        , expression = Expressions
-                        }, Acc) when length(Expressions) == 1 ->
-  [Expression] = Expressions,
+                        , expression = #entry{} = Expression
+                        }, Acc) ->
   case Expression of
     #entry{type = <<"rule_ref">>, name = Name} ->
       [{ParentName, Name} | Acc];

@@ -81,7 +81,7 @@ assert_match( [ExpectedRule|ExpectedRules]
   assert_match_rule(ExpectedRule, ResultRule),
   assert_match(ExpectedRules, ResultRules).
 
-assert_match_rule([], _) ->
+  assert_match_rule([], _) ->
   ok;
 assert_match_rule([{name, Name} | Rest], Entry) ->
   ?assertEqual(Name, Entry#entry.name),
@@ -90,5 +90,5 @@ assert_match_rule([{type, Type} | Rest], Entry) ->
   ?assertEqual(Type, Entry#entry.type),
   assert_match_rule(Rest, Entry);
 assert_match_rule([{expression, Expression} | Rest], Entry) ->
-  assert_match([Expression], Entry#entry.expression),
+  assert_match_rule(Expression, Entry#entry.expression),
   assert_match_rule(Rest, Entry).

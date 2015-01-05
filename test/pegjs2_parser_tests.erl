@@ -145,10 +145,10 @@ parser_test_() ->
             , trivialGrammar()
             )
 %% TODO: garmmar should return proper parts
-%%   , run_test( "parses SuffixedExpression"
-%%             , "start = [a-d]"
-%%             , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
-%%             )
+  , run_test( "parses SuffixedExpression"
+            , "start = [a-d]"
+            , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
+            )
   , run_test( "parses SuffixedExpression"
             , "start = ."
             , anyGrammar()
@@ -483,66 +483,66 @@ parser_test_() ->
             , classGrammar([], false, false, <<"[]">>)
             )
 %% TODO: Fix parts in regexps
-%%   , run_test("parses CharacterClassMatcher"
-%%             , "start = [a-d]"
-%%             , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
-%%             )
+  , run_test("parses CharacterClassMatcher"
+            , "start = [a-d]"
+            , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
+            )
   , run_test("parses CharacterClassMatcher"
             , "start = [a]"
             , classGrammar([<<"a">>], false, false, <<"[a]">>)
             )
 %% TODO: Fix parts in regexps
-%%   , run_test("parses CharacterClassMatcher"
-%%             , "start = [a-de-hi-l]"
-%%             , classGrammar( [[<<"a">>, <<"d">>], [<<"e">>, <<"h">>], [<<"i">>, <<"l">>]]
-%%                           , false
-%%                           , false
-%%                           , <<"[a-de-hi-l]">>
-%%                           )
-%%             )
-%%   , run_test("parses CharacterClassMatcher"
-%%             , "start = [^a-d]"
-%%             , classGrammar([[<<"a">>, <<"d">>]], true, false, <<"[^a-d]">>)
-%%             )
-%%   , run_test("parses CharacterClassMatcher"
-%%             , "start = [a-d]i"
-%%             , classGrammar([[<<"a">>, <<"d">>]], false, true, <<"[a-d]i">>)
-%%             )
+  , run_test("parses CharacterClassMatcher"
+            , "start = [a-de-hi-l]"
+            , classGrammar( [[<<"a">>, <<"d">>], [<<"e">>, <<"h">>], [<<"i">>, <<"l">>]]
+                          , false
+                          , false
+                          , <<"[a-de-hi-l]">>
+                          )
+            )
+  , run_test("parses CharacterClassMatcher"
+            , "start = [^a-d]"
+            , classGrammar([[<<"a">>, <<"d">>]], true, false, <<"[^a-d]">>)
+            )
+  , run_test("parses CharacterClassMatcher"
+            , "start = [a-d]i"
+            , classGrammar([[<<"a">>, <<"d">>]], false, true, <<"[a-d]i">>)
+            )
 %% TODO: Fix empty classes
-%%   , run_test("parses CharacterClassMatcher"
-%%             , "start = [\\\n]"
-%%             , classGrammar([], false, true, <<"[\\\n]">>)
-%%             )
+  , run_test("parses CharacterClassMatcher"
+            , "start = [\\\n]"
+            , classGrammar([], false, true, <<"[\\\n]">>)
+            )
   %% Canonical ClassCharacterRange is "a-d"
 %% TODO: Fix parts in regexps
-%%   , run_test("parses ClassCharacterRange"
-%%             , "start = [a-d]"
-%%             , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
-%%             )
-%%   , run_test("parses ClassCharacterRange"
-%%             , "start = [a-a]"
-%%             , classGrammar([[<<"a">>, <<"a">>]], false, false, <<"[a-a]">>)
-%%             )
+  , run_test("parses ClassCharacterRange"
+            , "start = [a-d]"
+            , classGrammar([[<<"a">>, <<"d">>]], false, false, <<"[a-d]">>)
+            )
+  , run_test("parses ClassCharacterRange"
+            , "start = [a-a]"
+            , classGrammar([[<<"a">>, <<"a">>]], false, false, <<"[a-a]">>)
+            )
 %% TODO: Fix range checks
-%%   , run_test("parses ClassCharacterRange"
-%%             , "start = [b-a]"
-%%             , ?FAIL({error, _})
-%%             )
+  , run_test("parses ClassCharacterRange"
+            , "start = [b-a]"
+            , ?FAIL({error, _})
+            )
   %% Canonical ClassCharacter is "a"
   , run_test("parses ClassCharacter"
             , "start = [a]"
             , classGrammar([<<"a">>], false, false, <<"[a]">>)
             )
 %% TODO: Fix parts in regexps
-%%   , run_test("parses ClassCharacter"
-%%             , "start = [\\n]"
-%%             , classGrammar([<<"\n">>], false, false, <<"[\\n]">>)
-%%             )
+  , run_test("parses ClassCharacter"
+            , "start = [\\n]"
+            , classGrammar([<<"\n">>], false, false, <<"[\\n]">>)
+            )
 %% TODO: Remove empty character ranges
-%%   , run_test("parses ClassCharacter"
-%%             , "start = [\\\n]"
-%%             , classGrammar([], false, false, <<"[a]">>)
-%%             )
+  , run_test("parses ClassCharacter"
+            , "start = [\\\n]"
+            , classGrammar([], false, false, <<"[a]">>)
+            )
   , run_test("parses ClassCharacter"
             , "start = []]"
             , ?FAIL({error, _})
@@ -670,10 +670,10 @@ parser_test_() ->
             , actionGrammar(<<"{a}">>)
             )
 %% TODO: Fix multiple brackets
-%%   , run_test("parses Code"
-%%             , "start = \"abcd\" {{a}{b}{c}}"
-%%             , actionGrammar(<<"{a}{b}{c}">>)
-%%             )
+  , run_test("parses Code"
+            , "start = \"abcd\" {{a}{b}{c}}"
+            , actionGrammar(<<"{a}{b}{c}">>)
+            )
   , run_test("parses Code"
             , "start = \"abcd\" {{}"
             , ?FAIL({error, _})

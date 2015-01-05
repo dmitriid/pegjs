@@ -12,7 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-.PHONY: all deps app rel docs tests clean distclean help
+.PHONY: all deps app rel docs tests clean distclean help erlang-mk
 
 ERLANG_MK_VERSION = 1
 
@@ -72,6 +72,18 @@ define core_http_get
 endef
 endif
 
+# Automated update.
+
+ERLANG_MK_BUILD_CONFIG ?= build.config
+ERLANG_MK_BUILD_DIR ?= .erlang.mk.build
+
+erlang-mk:
+	git clone https://github.com/ninenines/erlang.mk $(ERLANG_MK_BUILD_DIR)
+	if [ -f $(ERLANG_MK_BUILD_CONFIG) ]; then cp $(ERLANG_MK_BUILD_CONFIG) $(ERLANG_MK_BUILD_DIR); fi
+	cd $(ERLANG_MK_BUILD_DIR) && make
+	cp $(ERLANG_MK_BUILD_DIR)/erlang.mk ./erlang.mk
+	rm -rf $(ERLANG_MK_BUILD_DIR)
+
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
 
@@ -108,7 +120,7 @@ deps:: $(ALL_DEPS_DIRS)
 		if [ -f $$dep/GNUmakefile ] || [ -f $$dep/makefile ] || [ -f $$dep/Makefile ] ; then \
 			$(MAKE) -C $$dep ; \
 		else \
-			echo "include $(CURDIR)/erlang.mk" | $(MAKE) -f - -C $$dep ; \
+			echo "include $(CURDIR)/erlang.mk" | ERLC_OPTS=+debug_info $(MAKE) -f - -C $$dep ; \
 		fi ; \
 	done
 
@@ -123,6 +135,8 @@ define dep_fetch
 	elif [ "$$$$VS" = "hg" ]; then \
 		hg clone -U $$$$REPO $(DEPS_DIR)/$(1); \
 		cd $(DEPS_DIR)/$(1) && hg update -q $$$$COMMIT; \
+	elif [ "$$$$VS" = "svn" ]; then \
+		svn checkout $$$$REPO $(DEPS_DIR)/$(1); \
 	else \
 		echo "Unknown or invalid dependency: $(1). Please consult the erlang.mk README for instructions." >&2; \
 		exit 78; \
@@ -132,8 +146,8 @@ endef
 define dep_target
 $(DEPS_DIR)/$(1):
 	@mkdir -p $(DEPS_DIR)
-	@if [ ! -f $(PKG_FILE2) ]; then $(call core_http_get,$(PKG_FILE2),$(PKG_FILE_URL)); fi
 ifeq (,$(dep_$(1)))
+	@if [ ! -f $(PKG_FILE2) ]; then $(call core_http_get,$(PKG_FILE2),$(PKG_FILE_URL)); fi
 	@DEPPKG=$$$$(awk 'BEGIN { FS = "\t" }; $$$$1 == "$(1)" { print $$$$2 " " $$$$3 " " $$$$4 }' $(PKG_FILE2);); \
 	VS=$$$$(echo $$$$DEPPKG | cut -d " " -f1); \
 	REPO=$$$$(echo $$$$DEPPKG | cut -d " " -f2); \
@@ -176,8 +190,10 @@ pkg-search:
 	$(error Usage: make pkg-search q=STRING)
 endif
 
+ifeq ($(PKG_FILE2),$(CURDIR)/.erlang.mk.packages.v2)
 distclean-pkg:
 	$(gen_verbose) rm -f $(PKG_FILE2)
+endif
 
 help::
 	@printf "%s\n" "" \
@@ -192,21 +208,31 @@ help::
 
 # Configuration.
 
-ERLC_OPTS ?= -Werror +debug_info +warn_export_all +warn_export_vars \
-	+warn_shadow_vars +warn_obsolete_guard # +bin_opt_info +warn_missing_spec
+ERLC_OPTS ?= -Werror +debug_info +warn_export_vars +warn_shadow_vars \
+	+warn_obsolete_guard # +bin_opt_info +warn_export_all +warn_missing_spec
 COMPILE_FIRST ?=
 COMPILE_FIRST_PATHS = $(addprefix src/,$(addsuffix .erl,$(COMPILE_FIRST)))
+ERLC_EXCLUDE ?=
+ERLC_EXCLUDE_PATHS = $(addprefix src/,$(addsuffix .erl,$(ERLC_EXCLUDE)))
+
+ERLC_MIB_OPTS ?=
+COMPILE_MIB_FIRST ?=
+COMPILE_MIB_FIRST_PATHS = $(addprefix mibs/,$(addsuffix .mib,$(COMPILE_MIB_FIRST)))
 
 # Verbosity.
 
 appsrc_verbose_0 = @echo " APP   " $(PROJECT).app.src;
 appsrc_verbose = $(appsrc_verbose_$(V))
 
-erlc_verbose_0 = @echo " ERLC  " $(filter %.erl %.core,$(?F));
+erlc_verbose_0 = @echo " ERLC  " $(filter-out $(patsubst %,%.erl,$(ERLC_EXCLUDE)),\
+	$(filter %.erl %.core,$(?F)));
 erlc_verbose = $(erlc_verbose_$(V))
 
 xyrl_verbose_0 = @echo " XYRL  " $(filter %.xrl %.yrl,$(?F));
 xyrl_verbose = $(xyrl_verbose_$(V))
+
+mib_verbose_0 = @echo " MIB   " $(filter %.bin %.mib,$(?F));
+mib_verbose = $(mib_verbose_$(V))
 
 # Core targets.
 
@@ -217,13 +243,16 @@ app:: erlc-include ebin/$(PROJECT).app
 		echo "Empty modules entry not found in $(PROJECT).app.src. Please consult the erlang.mk README for instructions." >&2; \
 		exit 1; \
 	fi
+	$(eval GITDESCRIBE := $(shell git describe --dirty --abbrev=7 --tags --always --first-parent 2>/dev/null || true))
 	$(appsrc_verbose) cat src/$(PROJECT).app.src \
 		| sed "s/{modules,[[:space:]]*\[\]}/{modules, \[$(MODULES)\]}/" \
+		| sed "s/{id,[[:space:]]*\"git\"}/{id, \"$(GITDESCRIBE)\"}/" \
 		> ebin/$(PROJECT).app
 
 define compile_erl
 	$(erlc_verbose) erlc -v $(ERLC_OPTS) -o ebin/ \
-		-pa ebin/ -I include/ $(COMPILE_FIRST_PATHS) $(1)
+		-pa ebin/ -I include/ $(filter-out $(ERLC_EXCLUDE_PATHS),\
+		$(COMPILE_FIRST_PATHS) $(1))
 endef
 
 define compile_xyrl
@@ -232,9 +261,21 @@ define compile_xyrl
 	@rm ebin/*.erl
 endef
 
+define compile_mib
+	$(mib_verbose) erlc -v $(ERLC_MIB_OPTS) -o priv/mibs/ \
+		-I priv/mibs/ $(COMPILE_MIB_FIRST_PATHS) $(1)
+	$(mib_verbose) erlc -o include/ -- priv/mibs/*.bin
+endef
+
 ifneq ($(wildcard src/),)
 ebin/$(PROJECT).app::
 	@mkdir -p ebin/
+
+ifneq ($(wildcard mibs/),)
+ebin/$(PROJECT).app:: $(shell find mibs -type f -name \*.mib)
+	@mkdir -p priv/mibs/ include
+	$(if $(strip $?),$(call compile_mib,$?))
+endif
 
 ebin/$(PROJECT).app:: $(shell find src -type f -name \*.erl) \
 		$(shell find src -type f -name \*.core)
@@ -255,7 +296,8 @@ erlc-include:
 	fi
 
 clean-app:
-	$(gen_verbose) rm -rf ebin/
+	$(gen_verbose) rm -rf ebin/ priv/mibs/ \
+		$(addprefix include/,$(addsuffix .hrl,$(notdir $(basename $(wildcard mibs/*.mib)))))
 
 # Copyright (c) 2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
@@ -278,6 +320,7 @@ help::
 bs_appsrc = "{application, $(PROJECT), [" \
 	"	{description, \"\"}," \
 	"	{vsn, \"0.1.0\"}," \
+	"	{id, \"git\"}," \
 	"	{modules, []}," \
 	"	{registered, []}," \
 	"	{applications, [" \
@@ -290,6 +333,7 @@ bs_appsrc = "{application, $(PROJECT), [" \
 bs_appsrc_lib = "{application, $(PROJECT), [" \
 	"	{description, \"\"}," \
 	"	{vsn, \"0.1.0\"}," \
+	"	{id, \"git\"}," \
 	"	{modules, []}," \
 	"	{registered, []}," \
 	"	{applications, [" \
@@ -374,6 +418,56 @@ tpl_gen_server = "-module($(n))." \
 	"" \
 	"code_change(_OldVsn, State, _Extra) ->" \
 	"	{ok, State}."
+tpl_gen_fsm = "-module($(n))." \
+	"-behaviour(gen_fsm)." \
+	"" \
+	"%% API." \
+	"-export([start_link/0])." \
+	"" \
+	"%% gen_fsm." \
+	"-export([init/1])." \
+	"-export([state_name/2])." \
+	"-export([handle_event/3])." \
+	"-export([state_name/3])." \
+	"-export([handle_sync_event/4])." \
+	"-export([handle_info/3])." \
+	"-export([terminate/3])." \
+	"-export([code_change/4])." \
+	"" \
+	"-record(state, {" \
+	"})." \
+	"" \
+	"%% API." \
+	"" \
+	"-spec start_link() -> {ok, pid()}." \
+	"start_link() ->" \
+	"	gen_fsm:start_link(?MODULE, [], [])." \
+	"" \
+	"%% gen_fsm." \
+	"" \
+	"init([]) ->" \
+	"	{ok, state_name, \#state{}}." \
+	"" \
+	"state_name(_Event, StateData) ->" \
+	"	{next_state, state_name, StateData}." \
+	"" \
+	"handle_event(_Event, StateName, StateData) ->" \
+	"	{next_state, StateName, StateData}." \
+	"" \
+	"state_name(_Event, _From, StateData) ->" \
+	"	{reply, ignored, state_name, StateData}." \
+	"" \
+	"handle_sync_event(_Event, _From, StateName, StateData) ->" \
+	"	{reply, ignored, StateName, StateData}." \
+	"" \
+	"handle_info(_Info, StateName, StateData) ->" \
+	"	{next_state, StateName, StateData}." \
+	"" \
+	"terminate(_Reason, _StateName, _StateData) ->" \
+	"	ok." \
+	"" \
+	"code_change(_OldVsn, StateName, StateData, _Extra) ->" \
+	"	{ok, StateName, StateData}."
 tpl_cowboy_http = "-module($(n))." \
 	"-behaviour(cowboy_http_handler)." \
 	"" \
@@ -533,6 +627,112 @@ endif
 list-templates:
 	@echo Available templates: $(sort $(patsubst tpl_%,%,$(filter tpl_%,$(.VARIABLES))))
 
+# Copyright (c) 2014, Loïc Hoguin <essen@ninenines.eu>
+# This file is part of erlang.mk and subject to the terms of the ISC License.
+
+.PHONY: clean-c_src distclean-c_src-env
+# todo
+
+# Configuration.
+
+C_SRC_DIR = $(CURDIR)/c_src
+C_SRC_ENV ?= $(C_SRC_DIR)/env.mk
+C_SRC_OUTPUT ?= $(CURDIR)/priv/$(PROJECT).so
+
+# System type and C compiler/flags.
+
+UNAME_SYS := $(shell uname -s)
+ifeq ($(UNAME_SYS), Darwin)
+	CC ?= cc
+	CFLAGS ?= -O3 -std=c99 -arch x86_64 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -arch x86_64 -finline-functions -Wall
+	LDFLAGS ?= -arch x86_64 -flat_namespace -undefined suppress
+else ifeq ($(UNAME_SYS), FreeBSD)
+	CC ?= cc
+	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -finline-functions -Wall
+else ifeq ($(UNAME_SYS), Linux)
+	CC ?= gcc
+	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -finline-functions -Wall
+endif
+
+CFLAGS += -fPIC -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
+CXXFLAGS += -fPIC -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
+
+LDLIBS += -L $(ERL_INTERFACE_LIB_DIR) -lerl_interface -lei
+LDFLAGS += -shared
+
+# Verbosity.
+
+c_verbose_0 = @echo " C     " $(?F);
+c_verbose = $(c_verbose_$(V))
+
+cpp_verbose_0 = @echo " CPP   " $(?F);
+cpp_verbose = $(cpp_verbose_$(V))
+
+link_verbose_0 = @echo " LD    " $(@F);
+link_verbose = $(link_verbose_$(V))
+
+# Targets.
+
+ifeq ($(wildcard $(C_SRC_DIR)),)
+else ifneq ($(wildcard $(C_SRC_DIR)/Makefile),)
+app::
+	$(MAKE) -C $(C_SRC_DIR)
+
+clean::
+	$(MAKE) -C $(C_SRC_DIR) clean
+
+else
+SOURCES := $(shell find $(C_SRC_DIR) -type f \( -name "*.c" -o -name "*.C" -o -name "*.cc" -o -name "*.cpp" \))
+OBJECTS = $(addsuffix .o, $(basename $(SOURCES)))
+
+COMPILE_C = $(c_verbose) $(CC) $(CFLAGS) $(CPPFLAGS) -c
+COMPILE_CPP = $(cpp_verbose) $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c
+
+app:: $(C_SRC_ENV) $(C_SRC_OUTPUT)
+
+$(C_SRC_OUTPUT): $(OBJECTS)
+	@mkdir -p priv/
+	$(link_verbose) $(CC) $(OBJECTS) $(LDFLAGS) $(LDLIBS) -o $(C_SRC_OUTPUT)
+
+%.o: %.c
+	$(COMPILE_C) $(OUTPUT_OPTION) $<
+
+%.o: %.cc
+	$(COMPILE_CPP) $(OUTPUT_OPTION) $<
+
+%.o: %.C
+	$(COMPILE_CPP) $(OUTPUT_OPTION) $<
+
+%.o: %.cpp
+	$(COMPILE_CPP) $(OUTPUT_OPTION) $<
+
+$(C_SRC_ENV):
+	@erl -noshell -noinput -eval "file:write_file(\"$(C_SRC_ENV)\", \
+		io_lib:format( \
+			\"ERTS_INCLUDE_DIR ?= ~s/erts-~s/include/~n\" \
+			\"ERL_INTERFACE_INCLUDE_DIR ?= ~s~n\" \
+			\"ERL_INTERFACE_LIB_DIR ?= ~s~n\", \
+			[code:root_dir(), erlang:system_info(version), \
+			code:lib_dir(erl_interface, include), \
+			code:lib_dir(erl_interface, lib)])), \
+		erlang:halt()."
+
+clean:: clean-c_src
+
+clean-c_src:
+	$(gen_verbose) rm -f $(C_SRC_OUTPUT) $(OBJECTS)
+
+distclean:: distclean-c_src-env
+
+distclean-c_src-env:
+	$(gen_verbose) rm -f $(C_SRC_ENV)
+
+-include $(C_SRC_ENV)
+endif
+
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
 
@@ -580,7 +780,7 @@ build-ct-deps: $(ALL_TEST_DEPS_DIRS)
 	@for dep in $(ALL_TEST_DEPS_DIRS) ; do $(MAKE) -C $$dep; done
 
 build-ct-suites: build-ct-deps
-	$(gen_verbose) erlc -v $(TEST_ERLC_OPTS) -o test/ \
+	$(gen_verbose) erlc -v $(TEST_ERLC_OPTS) -I include/ -o test/ \
 		$(wildcard test/*.erl test/*/*.erl) -pa ebin/
 
 tests-ct: ERLC_OPTS = $(TEST_ERLC_OPTS)
@@ -622,6 +822,7 @@ DIALYZER_PLT ?= $(CURDIR)/.$(PROJECT).plt
 export DIALYZER_PLT
 
 PLT_APPS ?=
+DIALYZER_DIRS ?= --src -r src
 DIALYZER_OPTS ?= -Werror_handling -Wrace_conditions \
 	-Wunmatched_returns # -Wunderspecs
 
@@ -650,33 +851,7 @@ dialyze:
 else
 dialyze: $(DIALYZER_PLT)
 endif
-	@dialyzer --no_native --src -r src $(DIALYZER_OPTS)
-
-# Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
-# This file is part of erlang.mk and subject to the terms of the ISC License.
-
-# Verbosity.
-
-dtl_verbose_0 = @echo " DTL   " $(filter %.dtl,$(?F));
-dtl_verbose = $(dtl_verbose_$(V))
-
-# Core targets.
-
-define compile_erlydtl
-	$(dtl_verbose) erl -noshell -pa ebin/ $(DEPS_DIR)/erlydtl/ebin/ -eval ' \
-		Compile = fun(F) -> \
-			Module = list_to_atom( \
-				string:to_lower(filename:basename(F, ".dtl")) ++ "_dtl"), \
-			erlydtl:compile(F, Module, [{out_dir, "ebin/"}]) \
-		end, \
-		_ = [Compile(F) || F <- string:tokens("$(1)", " ")], \
-		init:stop()'
-endef
-
-ifneq ($(wildcard src/),)
-ebin/$(PROJECT).app:: $(shell find templates -type f -name \*.dtl 2>/dev/null)
-	$(if $(strip $?),$(call compile_erlydtl,$?))
-endif
+	@dialyzer --no_native $(DIALYZER_DIRS) $(DIALYZER_OPTS)
 
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
@@ -700,6 +875,215 @@ distclean:: distclean-edoc
 distclean-edoc:
 	$(gen_verbose) rm -f doc/*.css doc/*.html doc/*.png doc/edoc-info
 
+# Copyright (c) 2014, Juan Facorro <juan@inaka.net>
+# This file is part of erlang.mk and subject to the terms of the ISC License.
+
+.PHONY: elvis distclean-elvis
+
+# Configuration.
+
+ELVIS_CONFIG ?= $(CURDIR)/elvis.config
+
+ELVIS ?= $(CURDIR)/elvis
+export ELVIS
+
+ELVIS_URL ?= https://github.com/inaka/elvis/releases/download/0.2.3/elvis
+ELVIS_CONFIG_URL ?= https://github.com/inaka/elvis/releases/download/0.2.3/elvis.config
+ELVIS_OPTS ?=
+
+# Core targets.
+
+help::
+	@printf "%s\n" "" \
+		"Elvis targets:" \
+		"  elvis       Run Elvis using the local elvis.config or download the default otherwise"
+
+ifneq ($(wildcard $(ELVIS_CONFIG)),)
+rel:: distclean-elvis
+endif
+
+distclean:: distclean-elvis
+
+# Plugin-specific targets.
+
+$(ELVIS):
+	@$(call core_http_get,$(ELVIS_CONFIG),$(ELVIS_CONFIG_URL))
+	@$(call core_http_get,$(ELVIS),$(ELVIS_URL))
+	@chmod +x $(ELVIS)
+
+elvis: $(ELVIS)
+	@$(ELVIS) rock -c $(ELVIS_CONFIG) $(ELVIS_OPTS)
+
+distclean-elvis:
+	$(gen_verbose) rm -rf $(ELVIS)
+
+# Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
+# This file is part of erlang.mk and subject to the terms of the ISC License.
+
+# Configuration.
+
+DTL_FULL_PATH ?= 0
+
+# Verbosity.
+
+dtl_verbose_0 = @echo " DTL   " $(filter %.dtl,$(?F));
+dtl_verbose = $(dtl_verbose_$(V))
+
+# Core targets.
+
+define compile_erlydtl
+	$(dtl_verbose) erl -noshell -pa ebin/ $(DEPS_DIR)/erlydtl/ebin/ -eval ' \
+		Compile = fun(F) -> \
+			S = fun (1) -> re:replace(filename:rootname(string:sub_string(F, 11), ".dtl"), "/",  "_",  [{return, list}, global]); \
+				(0) -> filename:basename(F, ".dtl") \
+			end, \
+			Module = list_to_atom(string:to_lower(S($(DTL_FULL_PATH))) ++ "_dtl"), \
+			{ok, _} = erlydtl:compile(F, Module, [{out_dir, "ebin/"}, return_errors, {doc_root, "templates"}]) \
+		end, \
+		_ = [Compile(F) || F <- string:tokens("$(1)", " ")], \
+		init:stop()'
+endef
+
+ifneq ($(wildcard src/),)
+ebin/$(PROJECT).app:: $(shell find templates -type f -name \*.dtl 2>/dev/null)
+	$(if $(strip $?),$(call compile_erlydtl,$?))
+endif
+
+# Copyright (c) 2014 Dave Cottlehuber <dch@skunkwerks.at>
+# This file is part of erlang.mk and subject to the terms of the ISC License.
+
+.PHONY: distclean-escript escript
+
+# Configuration.
+
+ESCRIPT_NAME ?= $(PROJECT)
+ESCRIPT_COMMENT ?= This is an -*- erlang -*- file
+
+ESCRIPT_BEAMS ?= "ebin/*", "deps/*/ebin/*"
+ESCRIPT_SYS_CONFIG ?= "rel/sys.config"
+ESCRIPT_EMU_ARGS ?= -pa . \
+	-noshell -noinput  \
+	-sasl errlog_type error \
+	-escript main $(ESCRIPT_NAME)
+ESCRIPT_SHEBANG ?= /usr/bin/env escript
+ESCRIPT_STATIC ?= "deps/*/priv/**", "priv/**"
+
+# Core targets.
+
+distclean:: distclean-escript
+
+help::
+	@printf "%s\n" "" \
+		"Escript targets:" \
+		"  escript     Build an executable escript archive" \
+
+# Plugin-specific targets.
+
+# Based on https://github.com/synrc/mad/blob/master/src/mad_bundle.erl
+# Copyright (c) 2013 Maxim Sokhatsky, Synrc Research Center
+# Modified MIT License, https://github.com/synrc/mad/blob/master/LICENSE :
+# Software may only be used for the great good and the true happiness of all
+# sentient beings.
+define ESCRIPT_RAW
+'Read = fun(F) -> {ok, B} = file:read_file(filename:absname(F)), B end,'\
+'Files = fun(L) -> A = lists:concat([filelib:wildcard(X)||X<- L ]),'\
+'  [F || F <- A, not filelib:is_dir(F) ] end,'\
+'Squash = fun(L) -> [{filename:basename(F), Read(F) } || F <- L ] end,'\
+'Zip = fun(A, L) -> {ok,{_,Z}} = zip:create(A, L, [{compress,all},memory]), Z end,'\
+'Ez = fun(Escript) ->'\
+'  Static = Files([$(ESCRIPT_STATIC)]),'\
+'  Beams = Squash(Files([$(ESCRIPT_BEAMS), $(ESCRIPT_SYS_CONFIG)])),'\
+'  Archive = Beams ++ [{ "static.gz", Zip("static.gz", Static)}],'\
+'  escript:create(Escript, [ $(ESCRIPT_OPTIONS)'\
+'    {archive, Archive, [memory]},'\
+'    {shebang, "$(ESCRIPT_SHEBANG)"},'\
+'    {comment, "$(ESCRIPT_COMMENT)"},'\
+'    {emu_args, " $(ESCRIPT_EMU_ARGS)"}'\
+'  ]),'\
+'  file:change_mode(Escript, 8#755)'\
+'end,'\
+'Ez("$(ESCRIPT_NAME)").'
+endef
+ESCRIPT_COMMAND = $(subst ' ',,$(ESCRIPT_RAW))
+
+escript:: distclean-escript deps app
+	$(gen_verbose) erl -noshell -eval $(ESCRIPT_COMMAND) -s init stop
+
+distclean-escript:
+	$(gen_verbose) rm -f $(ESCRIPT_NAME)
+
+# Copyright (c) 2014, Enrique Fernandez <enrique.fernandez@erlang-solutions.com>
+# This file is contributed to erlang.mk and subject to the terms of the ISC License.
+
+.PHONY: help-eunit build-eunit eunit distclean-eunit
+
+# Configuration
+
+EUNIT_ERLC_OPTS ?= +debug_info +warn_export_vars +warn_shadow_vars +warn_obsolete_guard -DTEST=1 -DEXTRA=1
+
+EUNIT_DIR ?=
+EUNIT_DIRS = $(sort $(EUNIT_DIR) ebin)
+
+ifeq ($(strip $(EUNIT_DIR)),)
+TAGGED_EUNIT_TESTS = {dir,"ebin"}
+else
+# All modules in EUNIT_DIR
+EUNIT_DIR_MODS = $(notdir $(basename $(shell find $(EUNIT_DIR) -type f -name *.beam)))
+# All modules in 'ebin'
+EUNIT_EBIN_MODS = $(notdir $(basename $(shell find ebin -type f -name *.beam)))
+# Only those modules in EUNIT_DIR with no matching module in 'ebin'.
+# This is done to avoid some tests being executed twice.
+EUNIT_MODS = $(filter-out $(patsubst %,%_tests,$(EUNIT_EBIN_MODS)),$(EUNIT_DIR_MODS))
+TAGGED_EUNIT_TESTS = {dir,"ebin"} $(foreach mod,$(EUNIT_MODS),$(shell echo $(mod) | sed -e 's/\(.*\)/{module,\1}/g'))
+endif
+
+EUNIT_OPTS ?= verbose
+
+# Utility functions
+
+define str-join
+	$(shell echo '$(strip $(1))' | sed -e "s/ /,/g")
+endef
+
+# Core targets.
+
+help:: help-eunit
+
+tests:: eunit
+
+clean:: clean-eunit
+
+# Plugin-specific targets.
+
+EUNIT_RUN = erl \
+	-no_auto_compile \
+	-noshell \
+	-pa $(realpath $(EUNIT_DIR)) $(DEPS_DIR)/*/ebin \
+	-pz $(realpath ebin) \
+	-eval 'case eunit:test([$(call str-join,$(TAGGED_EUNIT_TESTS))], [$(EUNIT_OPTS)]) of ok -> erlang:halt(0); error -> erlang:halt(1) end.'
+
+help-eunit:
+	@printf "%s\n" "" \
+		"EUnit targets:" \
+		"  eunit       Run all the EUnit tests for this project"
+
+ifeq ($(strip $(EUNIT_DIR)),)
+build-eunit:
+else ifeq ($(strip $(EUNIT_DIR)),ebin)
+build-eunit:
+else
+build-eunit:
+	$(gen_verbose) erlc -v $(EUNIT_ERLC_OPTS) -I include/ -o $(EUNIT_DIR) \
+		$(wildcard $(EUNIT_DIR)/*.erl $(EUNIT_DIR)/*/*.erl) -pa ebin/
+endif
+
+eunit: ERLC_OPTS = $(EUNIT_ERLC_OPTS)
+eunit: clean deps app build-eunit
+	$(gen_verbose) $(EUNIT_RUN)
+
+clean-eunit:
+	$(gen_verbose) $(foreach dir,$(EUNIT_DIRS),rm -rf $(dir)/*.beam)
+
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
 
@@ -712,7 +1096,7 @@ RELX_CONFIG ?= $(CURDIR)/relx.config
 RELX ?= $(CURDIR)/relx
 export RELX
 
-RELX_URL ?= https://github.com/erlware/relx/releases/download/v1.0.2/relx
+RELX_URL ?= https://github.com/erlware/relx/releases/download/v1.1.0/relx
 RELX_OPTS ?=
 RELX_OUTPUT_DIR ?= _rel
 
@@ -756,7 +1140,7 @@ distclean-relx:
 
 # Configuration.
 
-SHELL_PATH ?= -pa ../$(PROJECT)/ebin $(DEPS_DIR)/*/ebin
+SHELL_PATH ?= -pa $(CURDIR)/ebin $(DEPS_DIR)/*/ebin
 SHELL_OPTS ?=
 
 ALL_SHELL_DEPS_DIRS = $(addprefix $(DEPS_DIR)/,$(SHELL_DEPS))

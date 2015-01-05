@@ -10,8 +10,7 @@
 %%_* Includes ==================================================================
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("../src/pegjs2.hrl").
-
--define(whenFail(OnFail, Condition), try Condition catch _:___Reason -> OnFail, error(___Reason) end).
+-include("pegjs_test.hrl").
 
 proxy_test_() ->
   [ run_test( "when a proxy rule isn't listed in |allowedStartRules| "
@@ -79,9 +78,11 @@ assert_match([], []) ->
 assert_match( [ExpectedRule|ExpectedRules]
             , [ResultRule|ResultRules]) ->
   assert_match_rule(ExpectedRule, ResultRule),
-  assert_match(ExpectedRules, ResultRules).
+  assert_match(ExpectedRules, ResultRules);
+assert_match(ExpectedRule, #entry{} = ResultRule) ->
+  assert_match_rule(ExpectedRule, ResultRule).
 
-  assert_match_rule([], _) ->
+assert_match_rule([], _) ->
   ok;
 assert_match_rule([{name, Name} | Rest], Entry) ->
   ?assertEqual(Name, Entry#entry.name),
@@ -90,5 +91,6 @@ assert_match_rule([{type, Type} | Rest], Entry) ->
   ?assertEqual(Type, Entry#entry.type),
   assert_match_rule(Rest, Entry);
 assert_match_rule([{expression, Expression} | Rest], Entry) ->
+  %io:format(user, "~n-----~n~p~n--~n~p~n-------~n", [Expression, Entry#entry.expression]),
   assert_match_rule(Expression, Entry#entry.expression),
   assert_match_rule(Rest, Entry).

@@ -10,8 +10,7 @@
 %%_* Inclides ==================================================================
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("../src/pegjs2.hrl").
-
--define( whenFail(OnFail, Condition), try Condition catch _:___Reason -> OnFail, error(___Reason) end).
+-include("pegjs_test.hrl").
 
 %% TODO: add rules to error conditions to check that we return proper rules
 

@@ -1,4 +1,4 @@
--type index() :: {{line, integer()}, {column, integer()}}.
+% -type index() :: {{line, integer()}, {column, integer()}}.
 -type input() :: binary().
 -type parse_failure() :: {error, term()}.
 -type parse_success() :: {term(), input(), index()}.
@@ -10,6 +10,7 @@
                     , index = {{line, 1}, {column, 1}}
                     , options = []
                     , match = []
+                    , text = <<>>
                     }).
 
 -define(DEBUG(W, Z), io:format("\n-------------\n" ++ W, Z)).

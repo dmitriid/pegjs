@@ -7,6 +7,7 @@
         , parse/2
         ]).
 
+% -type index() :: {{line, integer()}, {column, integer()}}.
 -type input() :: binary().
 -type parse_failure() :: {error, term()}.
 -type parse_success() :: {term(), input(), index()}.
@@ -18,6 +19,7 @@
                     , index = {{line, 1}, {column, 1}}
                     , options = []
                     , match = []
+                    , text = <<>>
                     }).
 
 -define(DEBUG(W, Z), io:format("\n-------------\n" ++ W, Z)).
@@ -98,16 +100,22 @@ input(#pegjs_node{input = Input}) -> Input;
 input(Other)                      -> Other.
 
 value(Label, #pegjs_node{match = Match}) ->
-  case lists:keyfind(Label, 1, Match) of
+  value(Label, Match);
+value(Label, {Label, Value}) -> Value;
+value(Label, List) when is_list(List) ->
+  case lists:keyfind(Label, 1, List) of
     {_, Value} -> Value;
     false      -> undefined
   end.
 
-text(Node) ->
-  TextNode = [T || Match <- match(Node)
-                 , T <- case Match of {_, Part} -> [Part]; Part -> [Part] end
-             ],
-  iolist_to_binary(TextNode).
+text(#pegjs_node{} = Node) ->
+  iolist_to_binary(text(match(Node)));
+text(B) when is_binary(B) ->
+  B;
+text({_, Value}) ->  %% labels
+  text(Value);
+text(List) when is_list(List) ->
+  [text(E) || E <- List].
 
 
 -include("pegjs2.hrl").
@@ -486,35 +494,35 @@ pegjs_rule('CharacterClassMatcher', Node) ->
   pegjs( Node
        , 'CharacterClassMatcher'
        , fun(N) -> 
-           (pegjs_combinator_named(pegjs_combinator_action(fun pegjs_custom_fun_412_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<91>>, false), pegjs_combinator_labeled(<<"inverted">>, pegjs_combinator_suffixed('optional', pegjs_combinator_literal(<<94>>, false))), pegjs_combinator_labeled(<<"parts">>, pegjs_combinator_suffixed('zero_or_more', pegjs_combinator_choice([pegjs_combinator_rule_ref('ClassCharacterRange'), pegjs_combinator_rule_ref('ClassCharacter')]))), pegjs_combinator_literal(<<93>>, false), pegjs_combinator_labeled(<<"ignoreCase">>, pegjs_combinator_suffixed('optional', pegjs_combinator_literal(<<105>>, false)))]))))(N)
+           (pegjs_combinator_named(pegjs_combinator_action(fun pegjs_custom_fun_411_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<91>>, false), pegjs_combinator_labeled(<<"inverted">>, pegjs_combinator_suffixed('optional', pegjs_combinator_literal(<<94>>, false))), pegjs_combinator_labeled(<<"parts">>, pegjs_combinator_suffixed('zero_or_more', pegjs_combinator_choice([pegjs_combinator_rule_ref('ClassCharacterRange'), pegjs_combinator_rule_ref('ClassCharacter')]))), pegjs_combinator_literal(<<93>>, false), pegjs_combinator_labeled(<<"ignoreCase">>, pegjs_combinator_suffixed('optional', pegjs_combinator_literal(<<105>>, false)))]))))(N)
          end
        );
 pegjs_rule('ClassCharacterRange', Node) -> 
   pegjs( Node
        , 'ClassCharacterRange'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_424_6/1, pegjs_combinator_sequence([pegjs_combinator_labeled(<<"begin">>, pegjs_combinator_rule_ref('ClassCharacter')), pegjs_combinator_literal(<<45>>, false), pegjs_combinator_labeled(<<"end">>, pegjs_combinator_rule_ref('ClassCharacter'))])))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_423_6/1, pegjs_combinator_sequence([pegjs_combinator_labeled(<<"begin">>, pegjs_combinator_rule_ref('ClassCharacter')), pegjs_combinator_literal(<<45>>, false), pegjs_combinator_labeled(<<"end">>, pegjs_combinator_rule_ref('ClassCharacter'))])))(N)
          end
        );
 pegjs_rule('ClassCharacter', Node) -> 
   pegjs( Node
        , 'ClassCharacter'
        , fun(N) -> 
-           (pegjs_combinator_choice([pegjs_combinator_action(fun pegjs_custom_fun_427_66/1, pegjs_combinator_sequence([pegjs_combinator_prefixed('simple_not', pegjs_combinator_choice([pegjs_combinator_literal(<<93>>, false), pegjs_combinator_literal(<<92>>, false), pegjs_combinator_rule_ref('LineTerminator')])), pegjs_combinator_rule_ref('SourceCharacter')])), pegjs_combinator_action(fun pegjs_custom_fun_428_83/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<92>>, false), pegjs_combinator_labeled(<<"sequence">>, pegjs_combinator_rule_ref('EscapeSequence'))])), pegjs_combinator_action(fun pegjs_custom_fun_429_36/1, pegjs_combinator_rule_ref('LineContinuation'))]))(N)
+           (pegjs_combinator_choice([pegjs_combinator_action(fun pegjs_custom_fun_426_66/1, pegjs_combinator_sequence([pegjs_combinator_prefixed('simple_not', pegjs_combinator_choice([pegjs_combinator_literal(<<93>>, false), pegjs_combinator_literal(<<92>>, false), pegjs_combinator_rule_ref('LineTerminator')])), pegjs_combinator_rule_ref('SourceCharacter')])), pegjs_combinator_action(fun pegjs_custom_fun_427_83/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<92>>, false), pegjs_combinator_labeled(<<"sequence">>, pegjs_combinator_rule_ref('EscapeSequence'))])), pegjs_combinator_action(fun pegjs_custom_fun_428_36/1, pegjs_combinator_rule_ref('LineContinuation'))]))(N)
          end
        );
 pegjs_rule('LineContinuation', Node) -> 
   pegjs( Node
        , 'LineContinuation'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_432_43/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<92>>, false), pegjs_combinator_rule_ref('LineTerminatorSequence')])))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_431_43/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<92>>, false), pegjs_combinator_rule_ref('LineTerminatorSequence')])))(N)
          end
        );
 pegjs_rule('EscapeSequence', Node) -> 
   pegjs( Node
        , 'EscapeSequence'
        , fun(N) -> 
-           (pegjs_combinator_choice([pegjs_combinator_rule_ref('CharacterEscapeSequence'), pegjs_combinator_action(fun pegjs_custom_fun_436_35/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<48>>, false), pegjs_combinator_prefixed('simple_not', pegjs_combinator_rule_ref('DecimalDigit'))])), pegjs_combinator_rule_ref('HexEscapeSequence'), pegjs_combinator_rule_ref('UnicodeEscapeSequence')]))(N)
+           (pegjs_combinator_choice([pegjs_combinator_rule_ref('CharacterEscapeSequence'), pegjs_combinator_action(fun pegjs_custom_fun_435_35/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<48>>, false), pegjs_combinator_prefixed('simple_not', pegjs_combinator_rule_ref('DecimalDigit'))])), pegjs_combinator_rule_ref('HexEscapeSequence'), pegjs_combinator_rule_ref('UnicodeEscapeSequence')]))(N)
          end
        );
 pegjs_rule('CharacterEscapeSequence', Node) -> 
@@ -528,14 +536,14 @@ pegjs_rule('SingleEscapeCharacter', Node) ->
   pegjs( Node
        , 'SingleEscapeCharacter'
        , fun(N) -> 
-           (pegjs_combinator_choice([pegjs_combinator_literal(<<39>>, false), pegjs_combinator_literal(<<34>>, false), pegjs_combinator_literal(<<92>>, false), pegjs_combinator_action(fun pegjs_custom_fun_448_24/1, pegjs_combinator_literal(<<98>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_449_24/1, pegjs_combinator_literal(<<102>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_450_24/1, pegjs_combinator_literal(<<110>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_451_24/1, pegjs_combinator_literal(<<114>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_452_24/1, pegjs_combinator_literal(<<116>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_453_24/1, pegjs_combinator_literal(<<118>>, false))]))(N)
+           (pegjs_combinator_choice([pegjs_combinator_literal(<<39>>, false), pegjs_combinator_literal(<<34>>, false), pegjs_combinator_literal(<<92>>, false), pegjs_combinator_action(fun pegjs_custom_fun_447_24/1, pegjs_combinator_literal(<<98>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_448_24/1, pegjs_combinator_literal(<<102>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_449_24/1, pegjs_combinator_literal(<<110>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_450_24/1, pegjs_combinator_literal(<<114>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_451_24/1, pegjs_combinator_literal(<<116>>, false)), pegjs_combinator_action(fun pegjs_custom_fun_452_24/1, pegjs_combinator_literal(<<118>>, false))]))(N)
          end
        );
 pegjs_rule('NonEscapeCharacter', Node) -> 
   pegjs( Node
        , 'NonEscapeCharacter'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_456_71/1, pegjs_combinator_sequence([pegjs_combinator_prefixed('simple_not', pegjs_combinator_choice([pegjs_combinator_rule_ref('EscapeCharacter'), pegjs_combinator_rule_ref('LineTerminator')])), pegjs_combinator_rule_ref('SourceCharacter')])))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_455_71/1, pegjs_combinator_sequence([pegjs_combinator_prefixed('simple_not', pegjs_combinator_choice([pegjs_combinator_rule_ref('EscapeCharacter'), pegjs_combinator_rule_ref('LineTerminator')])), pegjs_combinator_rule_ref('SourceCharacter')])))(N)
          end
        );
 pegjs_rule('EscapeCharacter', Node) -> 
@@ -549,14 +557,14 @@ pegjs_rule('HexEscapeSequence', Node) ->
   pegjs( Node
        , 'HexEscapeSequence'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_467_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<120>>, false), pegjs_combinator_labeled(<<"digits">>, pegjs_combinator_text(pegjs_combinator_sequence([pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit')])))])))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_466_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<120>>, false), pegjs_combinator_labeled(<<"digits">>, pegjs_combinator_text(pegjs_combinator_sequence([pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit')])))])))(N)
          end
        );
 pegjs_rule('UnicodeEscapeSequence', Node) -> 
   pegjs( Node
        , 'UnicodeEscapeSequence'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_472_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<117>>, false), pegjs_combinator_labeled(<<"digits">>, pegjs_combinator_text(pegjs_combinator_sequence([pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit')])))])))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_471_6/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<117>>, false), pegjs_combinator_labeled(<<"digits">>, pegjs_combinator_text(pegjs_combinator_sequence([pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit'), pegjs_combinator_rule_ref('HexDigit')])))])))(N)
          end
        );
 pegjs_rule('DecimalDigit', Node) -> 
@@ -577,14 +585,14 @@ pegjs_rule('AnyMatcher', Node) ->
   pegjs( Node
        , 'AnyMatcher'
        , fun(N) -> 
-           (pegjs_combinator_action(fun pegjs_custom_fun_481_37/1, pegjs_combinator_literal(<<46>>, false)))(N)
+           (pegjs_combinator_action(fun pegjs_custom_fun_480_37/1, pegjs_combinator_literal(<<46>>, false)))(N)
          end
        );
 pegjs_rule('CodeBlock', Node) -> 
   pegjs( Node
        , 'CodeBlock'
        , fun(N) -> 
-           (pegjs_combinator_named(pegjs_combinator_action(fun pegjs_custom_fun_484_50/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<123>>, false), pegjs_combinator_labeled(<<"code">>, pegjs_combinator_rule_ref('Code')), pegjs_combinator_literal(<<125>>, false)]))))(N)
+           (pegjs_combinator_named(pegjs_combinator_action(fun pegjs_custom_fun_483_50/1, pegjs_combinator_sequence([pegjs_combinator_literal(<<123>>, false), pegjs_combinator_labeled(<<"code">>, pegjs_combinator_rule_ref('Code')), pegjs_combinator_literal(<<125>>, false)]))))(N)
          end
        );
 pegjs_rule('Code', Node) -> 
@@ -1214,48 +1222,25 @@ pegjs_custom_fun_230_6(Node) ->
             }
     .
 
--spec pegjs_custom_fun_481_37(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_481_37(_Node) -> 
- #entry{type = <<"any">>} .
-
 -spec pegjs_custom_fun_448_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_448_24(_Node) -> 
- <<"\b">>   .
+ <<"\f">>   .
 
--spec pegjs_custom_fun_427_66(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_427_66(Node) -> 
+-spec pegjs_custom_fun_431_43(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_431_43(_Node) -> 
+ <<"">> .
+
+-spec pegjs_custom_fun_428_36(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_428_36(Node) -> 
  text(Node) .
 
 -spec pegjs_custom_fun_96_126(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_96_126(Node) -> 
  Code = value(<<"code">>, Node), #entry{type = <<"initializer">>, code = Code, index = index(Node)} .
 
--spec pegjs_custom_fun_484_50(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_484_50(Node) -> 
- value(<<"code">>, Node) .
-
--spec pegjs_custom_fun_472_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_472_6(Node) -> 
-
-      hexstr_to_bin(value(<<"digits">>, Node))
-    .
-
 -spec pegjs_custom_fun_450_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_450_24(_Node) -> 
- <<"\n">>   .
-
--spec pegjs_custom_fun_424_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_424_6(Node) -> 
-
-      Begin = value(<<"begin">>, Node),
-      End   = value(<<"end">>, Node),
-      case Begin > End of
-        true ->
-          error({invalid_character_range, {Begin, End, index(Node)}});
-        false ->
-          [Begin, End]
-      end
-    .
+ <<"\r">>   .
 
 -spec pegjs_custom_fun_222_74(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_222_74(Node) -> 
@@ -1279,7 +1264,11 @@ pegjs_custom_fun_170_6(Node) ->
 
 -spec pegjs_custom_fun_452_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_452_24(_Node) -> 
- <<"\t">>   .
+ <<"\v">>   .
+
+-spec pegjs_custom_fun_427_83(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_427_83(Node) -> 
+ iolist_to_binary(value(<<"sequence">>, Node)) .
 
 -spec pegjs_custom_fun_390_66(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_390_66(Node) -> 
@@ -1295,39 +1284,9 @@ pegjs_custom_fun_378_6(Node) ->
             }
     .
 
--spec pegjs_custom_fun_467_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_467_6(Node) -> 
-
-      hexstr_to_bin(value(<<"digits">>, Node))
-    .
-
--spec pegjs_custom_fun_456_71(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_456_71(Node) -> 
- text(Node) .
-
--spec pegjs_custom_fun_436_35(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_436_35(_Node) -> 
- <<"\0">> .
-
 -spec pegjs_custom_fun_381_88(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_381_88(Node) -> 
  iolist_to_binary(value(<<"chars">>, Node)) .
-
--spec pegjs_custom_fun_412_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_412_6(Node) -> 
-
-      Inverted   = value(<<"inverted">>, Node),
-      IgnoreCase = value(<<"ignoreCase">>, Node),
-      Parts0     = value(<<"parts">>, Node),
-      Parts      = filter_empty_strings(Parts0),
-      #entry{ type        = <<"class">>
-            , parts       = Parts
-            , inverted    = Inverted /= []
-            , ignore_case = IgnoreCase /= []
-            , raw_text    = text(Node)
-            , index       = index(Node)
-            }
-    .
 
 -spec pegjs_custom_fun_181_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_181_6(Node) -> 
@@ -1341,21 +1300,48 @@ pegjs_custom_fun_181_6(Node) ->
             }
     .
 
+-spec pegjs_custom_fun_480_37(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_480_37(_Node) -> 
+ #entry{type = <<"any">>} .
+
+-spec pegjs_custom_fun_447_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_447_24(_Node) -> 
+ <<"\b">>   .
+
 -spec pegjs_custom_fun_385_66(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_385_66(Node) -> 
  text(Node) .
 
+-spec pegjs_custom_fun_426_66(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_426_66(Node) -> 
+ text(Node) .
+
+-spec pegjs_custom_fun_483_50(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_483_50(Node) -> 
+ value(<<"code">>, Node) .
+
+-spec pegjs_custom_fun_471_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_471_6(Node) -> 
+
+      hexstr_to_bin(value(<<"digits">>, Node))
+    .
+
 -spec pegjs_custom_fun_449_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_449_24(_Node) -> 
- <<"\f">>   .
+ <<"\n">>   .
 
--spec pegjs_custom_fun_432_43(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_432_43(_Node) -> 
- <<"">> .
+-spec pegjs_custom_fun_423_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_423_6(Node) -> 
 
--spec pegjs_custom_fun_429_36(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_429_36(Node) -> 
- text(Node) .
+      Begin = value(<<"begin">>, Node),
+      End   = value(<<"end">>, Node),
+      case Begin > End of
+        true ->
+          error({invalid_character_range, {Begin, End, index(Node)}});
+        false ->
+          [Begin, End]
+      end
+    .
 
 -spec pegjs_custom_fun_240_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_240_6(Node) -> 
@@ -1426,7 +1412,21 @@ pegjs_custom_fun_121_6(Node) ->
 
 -spec pegjs_custom_fun_451_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_451_24(_Node) -> 
- <<"\r">>   .
+ <<"\t">>   .
+
+-spec pegjs_custom_fun_466_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_466_6(Node) -> 
+
+      hexstr_to_bin(value(<<"digits">>, Node))
+    .
+
+-spec pegjs_custom_fun_455_71(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_455_71(Node) -> 
+ text(Node) .
+
+-spec pegjs_custom_fun_435_35(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_435_35(_Node) -> 
+ <<"\0">> .
 
 -spec pegjs_custom_fun_155_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_155_6(Node) -> 
@@ -1461,13 +1461,20 @@ pegjs_custom_fun_139_6(Node) ->
       end
     .
 
--spec pegjs_custom_fun_453_24(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_453_24(_Node) -> 
- <<"\v">>   .
+-spec pegjs_custom_fun_411_6(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
+pegjs_custom_fun_411_6(Node) -> 
 
--spec pegjs_custom_fun_428_83(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
-pegjs_custom_fun_428_83(Node) -> 
- iolist_to_binary(value(<<"sequence">>, Node)) .
+      Inverted   = value(<<"inverted">>, Node),
+      IgnoreCase = value(<<"ignoreCase">>, Node),
+      Parts      = filter_empty_strings(value(<<"parts">>, Node)),
+      #entry{ type        = <<"class">>
+            , parts       = Parts
+            , inverted    = Inverted /= []
+            , ignore_case = IgnoreCase /= []
+            , raw_text    = text(Node)
+            , index       = index(Node)
+            }
+    .
 
 -spec pegjs_custom_fun_386_65(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.
 pegjs_custom_fun_386_65(Node) -> 

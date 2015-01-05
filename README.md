@@ -3,7 +3,7 @@
 This is a rather straightforward port/implementation of the grammar defined for
 [PEG.js](http://pegjs.majda.cz/documentation#grammar-syntax-and-semantics).
 
-## Current status
+## Current status [![Build Status](https://travis-ci.org/dmitriid/pegjs.svg?branch=0.4-refactor)](https://travis-ci.org/dmitriid/pegjs)
 
 - As far as I can tell, implements everything from the PEG.js grammar
 - Generates complete useable parsers

@@ -52,6 +52,8 @@ filter_empty_strings(Strings) ->
 
 filter_empty_strings([], Acc) ->
   lists:reverse(Acc);
+filter_empty_strings([<<"\\", N/binary>>|T], Acc) when N =:= <<"\n">>; N =:= <<"\r">> ->
+  filter_empty_strings(T, Acc);
 filter_empty_strings([H|T], Acc) ->
   filter_empty_strings(T, [filter_empty_strings(H) | Acc]);
 filter_empty_strings(<<>>, Acc) ->
@@ -77,6 +79,54 @@ ops_to_suffixed_types(<<"+">>) -> <<"one_or_more">>.
 ops_to_semantic_predicate_types([H|_])   -> ops_to_semantic_predicate_types(H);
 ops_to_semantic_predicate_types(<<"&">>) -> <<"semantic_and">>;
 ops_to_semantic_predicate_types(<<"!">>) -> <<"semantic_not">>.
+
+get_text_for_regexp_parts(Parts, Inverted, IgnoreCase) ->
+  << "["
+   , (case Inverted of true -> <<"^">>; false -> <<>> end)/binary
+   , (escape_for_regex(get_text_for_regexp_parts(Parts, <<>>)))/binary
+   , "]"
+   , (case IgnoreCase of true -> <<"i">>; false -> <<>> end)/binary
+   >>.
+
+get_text_for_regexp_parts([], Text) ->
+  Text;
+get_text_for_regexp_parts([[B1, B2] | Rest], Text) ->
+  get_text_for_regexp_parts(Rest, <<Text/binary, B1/binary, "-", B2/binary>>);
+get_text_for_regexp_parts([B | Rest], Text) ->
+  get_text_for_regexp_parts(Rest, <<Text/binary, B/binary>>).
+
+
+escape_for_regex(B) ->
+  escape_for_regex(B, <<>>).
+
+escape_for_regex(<<>>, Acc) ->
+  Acc;
+escape_for_regex(<<"\\", N/integer, Rest/binary>>, Acc) when N =:= $\n; N =:= $\r ->
+  escape_for_regex(Rest, <<Acc/binary, "\\", N/integer>>);
+escape_for_regex(<<C/integer, Rest/binary>>, Acc) ->
+  escape_for_regex(Rest, <<Acc/binary, (escape_char_for_regex(C))/binary>>).
+
+escape_char_for_regex($\\) -> <<$\\, $\\>>;      % backslash
+%% escape_char_for_regex($/) -> <<$\\, $/>>;   % closing slash
+%% escape_char_for_regex($]) -> <<$\\, $]>>;   % closing bracket
+%% escape_char_for_regex($^) -> <<$\\, $^>>;   % caret
+%% escape_for_regex($-) -> <<$\\, $->>;   % dash
+escape_char_for_regex($\0) -> <<$\\, $0>>;  % null
+escape_char_for_regex($\t) -> <<$\\, $t>>;  % horizontal tab
+escape_char_for_regex($\n) -> <<$\\, $n>>;  % line feed
+escape_char_for_regex($\v) -> <<$\\, $v>>;  % vertical tab
+escape_char_for_regex($\f) -> <<$\\, $f>>;  % form feed
+escape_char_for_regex($\r) -> <<$\\, $r>>;  % carriage return
+escape_char_for_regex($\") -> <<$\\, $\">>;      % ampersand
+escape_char_for_regex(C) -> <<C/integer>>.
+
+validate_regex_parts([]) ->
+  valid;
+validate_regex_parts([[Begin, End] | _]) when Begin > End ->
+  {invalid, [Begin, End]};
+validate_regex_parts([_ | Rest]) ->
+  validate_regex_parts(Rest).
+
 }
 
 /* ---- Syntactic Grammar ----- */
@@ -398,29 +448,28 @@ CharacterClassMatcher "character class"
     "]"
     ignoreCase:"i"?
     {
-      Inverted   = value(<<"inverted">>, Node),
-      IgnoreCase = value(<<"ignoreCase">>, Node),
-      Parts0     = value(<<"parts">>, Node),
-      Parts      = filter_empty_strings(Parts0),
-      #entry{ type        = <<"class">>
-            , parts       = Parts
-            , inverted    = Inverted /= []
-            , ignore_case = IgnoreCase /= []
-            , raw_text    = text(Node)
-            , index       = index(Node)
-            }
+      Inverted   = value(<<"inverted">>, Node) /= [],
+      IgnoreCase = value(<<"ignoreCase">>, Node) /= [],
+      Parts      = filter_empty_strings(value(<<"parts">>, Node)),
+      %% we do part validation here because `*`(zero_or_more) hides errors
+      case validate_regex_parts(Parts) of
+        {invalid, [Begin, End]} ->
+          {error, {invalid_character_range, {Begin, End, index(Node)}}};
+        valid  ->
+          Text       = get_text_for_regexp_parts(value(<<"parts">>, Node), Inverted, IgnoreCase),
+          #entry{ type        = <<"class">>
+                , parts       = Parts
+                , inverted    = Inverted
+                , ignore_case = IgnoreCase
+                , raw_text    = Text
+                , index       = index(Node)
+                }
+      end
     }
 
 ClassCharacterRange
   = begin:ClassCharacter "-" end:ClassCharacter {
-      Begin = value(<<"begin">>, Node),
-      End   = value(<<"end">>, Node),
-      case Begin > End of
-        true ->
-          error({invalid_character_range, {Begin, End, index(Node)}});
-        false ->
-          [Begin, End]
-      end
+      [value(<<"begin">>, Node), value(<<"end">>, Node)]
     }
 
 ClassCharacter

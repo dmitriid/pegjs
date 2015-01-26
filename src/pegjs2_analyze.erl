@@ -10,9 +10,6 @@
         , report_missing_rules/1
         , report_left_recursion/1
         , remove_proxy_rules/1
-%%         , perform_analysis/2
-%%         , file/1
-%%         , file/2
         ]).
 
 %%_* Includes ==================================================================

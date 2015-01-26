@@ -1,4 +1,4 @@
-% -type index() :: {{line, integer()}, {column, integer()}}.
+-type index() :: {{line, integer()}, {column, integer()}}.
 -type input() :: binary().
 -type parse_failure() :: {error, term()}.
 -type parse_success() :: {term(), input(), index()}.
@@ -28,10 +28,8 @@ pegjs(#pegjs_node{index = StartIndex} = Node, Name, ParseFun) ->
         {error,_} = Failure ->                       % If it fails, memoize the failure
           Failure;
         #pegjs_node{} = Match ->                     % If it passes, transform and memoize the result.
-          % Transformed = TransformFun(Match, StartIndex),
-          %{Transformed, InpRem, NewIndex}
           Match;
-        Other -> match(Other, Node)                  % for convenience, just return a match, no the full node
+        Other -> match(Other, Node)                  % for convenience, you can return a match only, not the full node
       end,
       memoize(StartIndex, Name, Result),
       Result
@@ -82,7 +80,7 @@ p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single c
 match(#pegjs_node{match = Match}) -> Match;
 match(Other)                      -> Other.
 
-match(New, Node)                  -> Node#pegjs_node{match = New}.
+match(NewMatch, Node)             -> Node#pegjs_node{match = NewMatch}.
 
 index(#pegjs_node{index = Index}) -> Index;
 index(Other)                      -> Other.
@@ -99,11 +97,4 @@ value(Label, List) when is_list(List) ->
     false      -> undefined
   end.
 
-text(#pegjs_node{} = Node) ->
-  iolist_to_binary(text(match(Node)));
-text(B) when is_binary(B) ->
-  B;
-text({_, Value}) ->  %% labels
-  text(Value);
-text(List) when is_list(List) ->
-  [text(E) || E <- List].
+text(#pegjs_node{text = Text}) -> Text.

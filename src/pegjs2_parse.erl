@@ -1123,7 +1123,7 @@ pegjs_combinator_suffixed(one_or_more, P) ->
 pegjs_combinator_suffixed(optional, P) ->
   fun(Node) ->
       case P(Node) of
-        {error, _} -> Node#pegjs_node{match = []};
+        {error, _} -> Node#pegjs_node{match = [], text = <<>>};
         Success -> Success
       end
   end.

@@ -10,6 +10,7 @@
         , report_missing_rules/1
         , report_left_recursion/1
         , remove_proxy_rules/1
+        , perform_code_analysis/1
         ]).
 
 %%_* Includes ==================================================================
@@ -92,15 +93,11 @@ perform_analysis(#entry{ type = <<"choice">>
   perform_analysis(Alternatives, Analysis);
 perform_analysis(#entry{ type = <<"action">>
                        , expression = Alternatives
-                       , code = Code0
+                       , code = Code
                        , index = Idx
                        }, #analysis{ code   = Codes0 } = Analysis) ->
-    case perform_code_analysis(Code0, Idx) of
-      {error, _} = E -> E;
-      {ok, F} ->
-        Codes = dict:store(Idx, F, Codes0),
-        perform_analysis(Alternatives, Analysis#analysis{code = Codes})
-    end;
+  Codes = dict:store(Idx, Code, Codes0),
+  perform_analysis(Alternatives, Analysis#analysis{code = Codes});
 perform_analysis(#entry{ type = <<"sequence">>
                        , elements = Elements
                        }, Analysis) ->
@@ -131,16 +128,12 @@ perform_analysis(#entry{ type = <<"rule_ref">>
              end,
   Analysis#analysis{required_rules = Required};
 perform_analysis(#entry{ type = Type
-                       , code = Code0
+                       , code = Code
                        , index = Idx
                        }, #analysis{code = Codes0} = Analysis) when Type =:= <<"semantic_and">>;
                                                                     Type =:= <<"semantic_not">>  ->
-    case perform_code_analysis(Code0, Idx) of
-      {error, _} = E -> E;
-      {ok, F} ->
-        Codes = dict:store(Idx, F, Codes0),
-        Analysis#analysis{code = Codes}
-    end;
+  Codes = dict:store(Idx, Code, Codes0),
+  Analysis#analysis{code = Codes};
 perform_analysis(#entry{ type = <<"literal">>
                        }, Analysis) ->
   Analysis;
@@ -208,11 +201,28 @@ is_combinator(Type) ->
                      , <<"choice">>
                      , <<"named">>]).
 
--spec perform_code_analysis(binary(), index()) ->
+
+-spec perform_code_analysis(#analysis{}) -> #analysis{} | {error, term()}.
+perform_code_analysis(#analysis{code = Codes0} = Analysis) ->
+  case perform_code_analysis(dict:to_list(Codes0), []) of
+    {error, _} = E -> E;
+    Codes          -> Analysis#analysis{code = dict:from_list(Codes)}
+  end.
+
+-spec perform_code_analysis(list(), list()) -> #analysis{} | {error, term()}.
+perform_code_analysis([], Accum) ->
+  Accum;
+perform_code_analysis([{Idx, Code}|T], Accum) ->
+  case analyze_code(Code, Idx) of
+    {error, _} = E -> E;
+    {ok, F}        -> perform_code_analysis(T, [{Idx, F} | Accum])
+  end.
+
+-spec analyze_code(binary(), index()) ->
   {ok, #function{}} | {error, term()}.
-perform_code_analysis(<<>>, Index) ->
+analyze_code(<<>>, Index) ->
   {error, {missing_action_code, Index}};
-perform_code_analysis(Code0, Index) ->
+analyze_code(Code0, Index) ->
   Code = case Code0 of
            [C] -> C;
            C -> C

@@ -61,7 +61,8 @@ compile(Options) ->
                     , fun pegjs2_analyze:report_left_recursion/1
                     , fun pegjs2_analyze:remove_proxy_rules/1
                     , fun pegjs2_analyze:perform_code_analysis/1
-                    , fun pegjs2_bytecode:generate/1
-                    , fun pegjs2_generate_functional:generate/1
+%%                     , fun pegjs2_bytecode:generate/1
+%%                     , fun pegjs2_generate_functional:generate/1
+                    , fun pegjs2_generate_eqc_model:generate/1
                     ]
                    , Options).

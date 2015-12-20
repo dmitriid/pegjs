@@ -1267,7 +1267,11 @@ pegjs_custom_fun_205_6(Node) ->
       Code = value(<<"code">>, Node),
       case Code of
         [] ->
-          entries(Expression);
+          #entry{ type       = <<"action">>
+                , expression = entries(Expression)
+                , code       = <<>>
+                , index      = index(Node)
+                };
         [_, C]  ->
           #entry{ type       = <<"action">>
                 , expression = entries(Expression)

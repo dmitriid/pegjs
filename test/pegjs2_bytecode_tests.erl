@@ -1,6 +1,6 @@
 %%%-----------------------------------------------------------------------------
 %%% @doc Unit tests for the bytecode generator
-%%%      Direct port of https://github.com/dmajda/pegjs/blob/master/spec/unit/compiler/passes/generate-bytecode.spec.js
+%%%      Direct port of https:%%github.com/dmajda/pegjs/blob/master/spec/unit/compiler/passes/generate-bytecode.spec.js
 %%% @author Dmitrii Dimandt <dmitrii@dmitriid.com>
 %%%
 %%%-----------------------------------------------------------------------------
@@ -17,9 +17,9 @@ bytecode_test_() ->
             , "a = \"a\"\n"
               "b = \"b\"\n"
               "c = \"c\""
-            , [ 14, 0, 2, 2, 18, 0, 19, 1
-              , 14, 2, 2, 2, 18, 2, 19, 3
-              , 14, 4, 2, 2, 18, 4, 19, 5
+            , [ <<18, 0, 2, 2, 22, 0, 23, 1>>
+              , <<18, 2, 2, 2, 22, 2, 23, 3>>
+              , <<18, 4, 2, 2, 22, 4, 23, 5>>
               ]
             , []
             )
@@ -44,18 +44,18 @@ bytecode_test_() ->
   , run_test( "for rule"
             , "start = \"a\""
             , [
-                14, 0, 2, 2, 18, 0, 19, 1 %% expression
+                <<18, 0, 2, 2, 22, 0, 23, 1>> %% expression
               ]
             , [])
   , run_test( "for named"
             , "start \"start\" = \"a\""
-            , [
-                24,                          %% SILENT_FAILS_ON
-                14, 1, 2, 2, 18, 1, 19, 2,   %% <expression>
-                25,                          %% SILENT_FAILS_OFF
-                10, 2, 0,                    %% IF_ERROR
-                19, 0                        %%   * FAIL
-              ]
+            , [ <<
+                  28,                          %% SILENT_FAILS_ON
+                  18, 1, 2, 2, 22, 1, 23, 2,   %% <expression>
+                  29,                          %% SILENT_FAILS_OFF
+                  14, 2, 0,                    %% IF_ERROR
+                  23, 0                        %%   * FAIL
+                >> ]
             , [ #entry{ type = <<"other">>
                       , description = <<"start">> }
               , <<"a">>
@@ -66,27 +66,27 @@ bytecode_test_() ->
             )
   , run_test( "for choice"
             , "start = \"a\" / \"b\" / \"c\""
-            , [
-                14, 0, 2, 2, 18, 0, 19, 1,   %% <alternatives[0]>
-                10, 21, 0,                   %% IF_ERROR
-                2,                           %%   * POP
-                14, 2, 2, 2, 18, 2, 19, 3,   %%     <alternatives[1]>
-                10, 9, 0,                    %%     IF_ERROR
-                2,                           %%       * POP
-                14, 4, 2, 2, 18, 4, 19, 5    %%         <alternatives[2]>
-              ]
+            , [<<
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <alternatives[0]>
+                 14, 21, 0,                   %% IF_ERROR
+                 6,                           %%   * POP
+                 18, 2, 2, 2, 22, 2, 23, 3,   %%     <alternatives[1]>
+                 14, 9, 0,                    %%     IF_ERROR
+                 6,                           %%       * POP
+                 18, 4, 2, 2, 22, 4, 23, 5    %%         <alternatives[2]>
+               >>]
             , []
             )
   , run_test( "for action, without labels"
             , "start = \"a\" { code }"
-            , [
-                1,                           %% PUSH_CURR_POS
-                14, 0, 2, 2, 18, 0, 19, 1,   %% <expression>
-                11, 6, 0,                    %% IF_NOT_ERROR
-                20, 1,                       %%   * REPORT_SAVED_POS
-                22, 2, 1, 0,                 %%     CALL
-                5                            %% NIP
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 15, 6, 0,                    %% IF_NOT_ERROR
+                 24, 1,                       %%   * LOAD_SAVED_POS
+                 26, 2, 1, 0,                 %%     CALL
+                 9                            %% NIP
+              >>]
             , [ <<"a">>
               , #entry{ type = <<"literal">>
                       , value = <<"a">>
@@ -96,14 +96,14 @@ bytecode_test_() ->
             )
   , run_test( "for action, with one label"
             , "start = a:\"a\" { code }"
-            , [
-                1,                           %% PUSH_CURR_POS
-                14, 0, 2, 2, 18, 0, 19, 1,   %% <expression>
-                11, 7, 0,                    %% IF_NOT_ERROR
-                20, 1,                       %%   * REPORT_SAVED_POS
-                22, 2, 1, 1, 0,              %%     CALL
-                5                            %% NIP
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 15, 7, 0,                    %% IF_NOT_ERROR
+                 24, 1,                       %%   * LOAD_SAVED_POS
+                 26, 2, 1, 1, 0,              %%     CALL
+                 9                            %% NIP
+              >>]
             , [ <<"a">>
               , #entry{ type = <<"literal">>
                       , value = <<"a">>
@@ -113,27 +113,27 @@ bytecode_test_() ->
             )
   , run_test( "for action, with multiple labels"
             , "start = a:\"a\" b:\"b\" c:\"c\" { code }"
-            , [
-                1,                           %% PUSH_CURR_POS
-                14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
-                11, 40, 3,                   %% IF_NOT_ERROR
-                14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
-                11, 25, 4,                   %%     IF_NOT_ERROR
-                14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
-                11, 10, 4,                   %%         IF_NOT_ERROR
-                20, 3,                       %%           * REPORT_SAVED_POS
-                22, 6, 3, 3, 2, 1, 0,        %%             CALL
-                5,                           %%             NIP
-                4, 3,                        %%           * POP_N
-                3,                           %%             POP_CURR_POS
-                28,                          %%             PUSH_FAILED
-                4, 2,                        %%       * POP_N
-                3,                           %%         POP_CURR_POS
-                28,                          %%         PUSH_FAILED
-                2,                           %%   * POP
-                3,                           %%     POP_CURR_POS
-                28                           %%     PUSH_FAILED
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <elements[0]>
+                 15, 40, 3,                   %% IF_NOT_ERROR
+                 18, 2, 2, 2, 22, 2, 23, 3,   %%   * <elements[1]>
+                 15, 25, 4,                   %%     IF_NOT_ERROR
+                 18, 4, 2, 2, 22, 4, 23, 5,   %%       * <elements[2]>
+                 15, 10, 4,                   %%         IF_NOT_ERROR
+                 24, 3,                       %%           * LOAD_SAVED_POS
+                 26, 6, 3, 3, 2, 1, 0,        %%             CALL
+                 9,                           %%             NIP
+                 8, 3,                        %%           * POP_N
+                 7,                           %%             POP_CURR_POS
+                 3,                           %%             PUSH_FAILED
+                 8, 2,                        %%       * POP_N
+                 7,                           %%         POP_CURR_POS
+                 3,                           %%         PUSH_FAILED
+                 6,                           %%   * POP
+                 7,                           %%     POP_CURR_POS
+                 3                            %%     PUSH_FAILED
+              >>]
             , [
                 <<"a">>
               , #entry{ type = <<"literal">>
@@ -152,26 +152,26 @@ bytecode_test_() ->
             )
   , run_test( "for sequence"
             , "start = \"a\" \"b\" \"c\""
-            , [
-                1,                           %% PUSH_CURR_POS
-                14, 0, 2, 2, 18, 0, 19, 1,   %% <elements[0]>
-                11, 33, 3,                   %% IF_NOT_ERROR
-                14, 2, 2, 2, 18, 2, 19, 3,   %%   * <elements[1]>
-                11, 18, 4,                   %%     IF_NOT_ERROR
-                14, 4, 2, 2, 18, 4, 19, 5,   %%       * <elements[2]>
-                11, 3, 4,                    %%         IF_NOT_ERROR
-                7, 3,                        %%           * WRAP
-                5,                           %%             NIP
-                4, 3,                        %%           * POP_N
-                3,                           %%             POP_CURR_POS
-                28,                          %%             PUSH_FAILED
-                4, 2,                        %%       * POP_N
-                3,                           %%         POP_CURR_POS
-                28,                          %%         PUSH_FAILED
-                2,                           %%   * POP
-                3,                           %%     POP_CURR_POS
-                28                           %%     PUSH_FAILED
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <elements[0]>
+                 15, 33, 3,                   %% IF_NOT_ERROR
+                 18, 2, 2, 2, 22, 2, 23, 3,   %%   * <elements[1]>
+                 15, 18, 4,                   %%     IF_NOT_ERROR
+                 18, 4, 2, 2, 22, 4, 23, 5,   %%       * <elements[2]>
+                 15, 3, 4,                    %%         IF_NOT_ERROR
+                 11, 3,                       %%           * WRAP
+                 9,                           %%             NIP
+                 8, 3,                        %%           * POP_N
+                 7,                           %%             POP_CURR_POS
+                 3,                           %%             PUSH_FAILED
+                 8, 2,                        %%       * POP_N
+                 7,                           %%         POP_CURR_POS
+                 3,                           %%         PUSH_FAILED
+                 6,                           %%   * POP
+                 7,                           %%     POP_CURR_POS
+                 3                            %%     PUSH_FAILED
+              >>]
             , [
                 <<"a">>,
                 #entry{type = <<"literal">>, value = <<"a">>, description = <<"\\\"a\\\"">>},
@@ -183,38 +183,38 @@ bytecode_test_() ->
             )
   , run_test( "for labeled"
             , "start = a:\"a\""
-            , [
-                14, 0, 2, 2, 18, 0, 19, 1    %%  PUSH_FAILED
-              ]
+            , [<<
+                 18, 0, 2, 2, 22, 0, 23, 1    %%  PUSH_FAILED
+              >>]
             , []
             )
   , run_test( "for text"
             , "start = $\"a\""
-            , [
-                1,                           %%  PUSH_CURR_POS
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                11, 2, 1,                    %%  IF_NOT_ERROR
-                2,                           %%    * POP
-                8,                           %%      TEXT
-                5                            %%    * NIP
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 15, 2, 1,                    %% IF_NOT_ERROR
+                 6,                           %%   * POP
+                 12,                          %%     TEXT
+                 9                            %%   * NIP
+              >>]
             , []
             )
   , run_test( "for simple_and"
             , "start = &\"a\""
-            , [
-                1,                           %%  PUSH_CURR_POS
-                24,                          %%  SILENT_FAILS_ON
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                25,                          %%  SILENT_FAILS_OFF
-                11, 3, 3,                    %%  IF_NOT_ERROR
-                2,                           %%    * POP
-                3,                           %%      POP_CURR_POS
-                26,                          %%      PUSH_UNDEFINED
-                2,                           %%    * POP
-                2,                           %%      POP
-                28                           %%      PUSH_FAILED
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 28,                          %% SILENT_FAILS_ON
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 29,                          %% SILENT_FAILS_OFF
+                 15, 3, 3,                    %% IF_NOT_ERROR
+                 6,                           %%   * POP
+                 7,                           %%     POP_CURR_POS
+                 1,                           %%     PUSH_UNDEFINED
+                 6,                           %%   * POP
+                 6,                           %%     POP
+                 3                            %%     PUSH_FAILED
+              >>]
             , [
                 <<"a">>,
                 #entry{ type = <<"literal">>
@@ -225,19 +225,19 @@ bytecode_test_() ->
             )
   , run_test( "for simple_not"
             , "start = !\"a\""
-            , [
-                1,                           %%  PUSH_CURR_POS
-                24,                          %%  SILENT_FAILS_ON
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                25,                          %%  SILENT_FAILS_OFF
-                10, 3, 3,                    %%  IF_ERROR
-                2,                           %%    * POP
-                2,                           %%      POP
-                26,                          %%      PUSH_UNDEFINED
-                2,                           %%    * POP
-                3,                           %%      POP_CURR_POS
-                28                           %%      PUSH_FAILED
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 28,                          %% SILENT_FAILS_ON
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 29,                          %% SILENT_FAILS_OFF
+                 14, 3, 3,                    %% IF_ERROR
+                 6,                           %%   * POP
+                 6,                           %%     POP
+                 1,                           %%     PUSH_UNDEFINED
+                 6,                           %%   * POP
+                 7,                           %%     POP_CURR_POS
+                 3                            %%     PUSH_FAILED              >>]
+               >>]
             , [
                 <<"a">>,
                 #entry{ type = <<"literal">>
@@ -247,12 +247,12 @@ bytecode_test_() ->
             )
   , run_test( "for optional"
             , "start = \"a\"?"
-            , [
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                10, 2, 0,                    %%  IF_ERROR
-                2,                           %%    * POP
-                27                           %%      PUSH_NULL
-              ]
+            , [<<
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 14, 2, 0,                    %% IF_ERROR
+                 6,                           %%   * POP
+                 2                            %%     PUSH_NULL
+              >>]
             , [
                 <<"a">>,
                 #entry{ type = <<"literal">>
@@ -262,14 +262,14 @@ bytecode_test_() ->
             )
   , run_test( "for zero_or_more"
             , "start = \"a\"*"
-            , [
-                29,                          %%  PUSH_EMPTY_ARRAY
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                12, 9,                       %%  WHILE_NOT_ERROR
-                6,                           %%    * APPEND
-                14, 0, 2, 2, 18, 0, 19, 1,   %%      <expression>
-                2                            %%  POP
-              ]
+            , [<<
+                 4,                           %% PUSH_EMPTY_ARRAY
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 16, 9,                       %% WHILE_NOT_ERROR
+                 10,                          %%   * APPEND
+                 18, 0, 2, 2, 22, 0, 23, 1,   %%     <expression>
+                 6                            %% POP
+              >>]
             , [
                 <<"a">>,
                 #entry{ type = <<"literal">>
@@ -279,18 +279,18 @@ bytecode_test_() ->
             )
   , run_test( "for one_or_more"
             , "start = \"a\"+"
-            , [
-                29,                          %%  PUSH_EMPTY_ARRAY
-                14, 0, 2, 2, 18, 0, 19, 1,   %%  <expression>
-                11, 12, 3,                   %%  IF_NOT_ERROR
-                12, 9,                       %%    * WHILE_NOT_ERROR
-                6,                           %%        * APPEND
-                14, 0, 2, 2, 18, 0, 19, 1,   %%          <expression>
-                2,                           %%      POP
-                2,                           %%    * POP
-                2,                           %%      POP
-                28                           %%      PUSH_FAILED
-              ]
+            , [<<
+                 4,                           %% PUSH_EMPTY_ARRAY
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <expression>
+                 15, 12, 3,                   %% IF_NOT_ERROR
+                 16, 9,                       %%   * WHILE_NOT_ERROR
+                 10,                          %%       * APPEND
+                 18, 0, 2, 2, 22, 0, 23, 1,   %%         <expression>
+                 6,                           %%     POP
+                 6,                           %%   * POP
+                 6,                           %%     POP
+                 3                            %%     PUSH_FAILED
+              >>]
             , [
                 <<"a">>,
                 #entry{ type = <<"literal">>
@@ -300,52 +300,52 @@ bytecode_test_() ->
             )
   , run_test( "for semantic_and, without labels"
             , "start = &{ code }"
-            , [
-                    21,            %%  REPORT_CURR_POS
-                    22, 0, 0, 0,   %%  CALL
-                    9, 2, 2,       %%  IF
-                    2,             %%    * POP
-                    26,            %%      PUSH_UNDEFINED
-                    2,             %%    * POP
-                    28             %%      PUSH_FAILED
-              ]
+            , [<<
+                 25,            %% UPDATE_SAVED_POS
+                 26, 0, 0, 0,   %% CALL
+                 13, 2, 2,      %% IF
+                 6,             %%   * POP
+                 1,             %%     PUSH_UNDEFINED
+                 6,             %%   * POP
+                 3              %%     PUSH_FAILED
+              >>]
             , [
                 {function, [], <<" code ">>}
               ]
             )
   , run_test( "for semantic_and, with labels"
             , "start = a:\"a\" b:\"b\" c:\"c\" &{ code }"
-            , [
-                    1,                           %%  PUSH_CURR_POS
-                    14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
-                    11, 55, 3,                   %%  IF_NOT_ERROR
-                    14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
-                    11, 40, 4,                   %%      IF_NOT_ERROR
-                    14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
-                    11, 25, 4,                   %%          IF_NOT_ERROR
-                    21,                          %%            * REPORT_CURR_POS
-                    22, 6, 0, 3, 2, 1, 0,        %%              CALL
-                    9, 2, 2,                     %%              IF
-                    2,                           %%                * POP
-                    26,                          %%                  PUSH_UNDEFINED
-                    2,                           %%                * POP
-                    28,                          %%                  PUSH_FAILED
-                    11, 3, 4,                    %%              IF_NOT_ERROR
-                    7, 4,                        %%                * WRAP
-                    5,                           %%                  NIP
-                    4, 4,                        %%                * POP_N
-                    3,                           %%                  POP_CURR_POS
-                    28,                          %%                  PUSH_FAILED
-                    4, 3,                        %%            * POP_N
-                    3,                           %%              POP_CURR_POS
-                    28,                          %%              PUSH_FAILED
-                    4, 2,                        %%        * POP_N
-                    3,                           %%          POP_CURR_POS
-                    28,                          %%          PUSH_FAILED
-                    2,                           %%    * POP
-                    3,                           %%      POP_CURR_POS
-                    28                           %%      PUSH_FAILED
-              ]
+            , [<<
+                 5,                           %% PUSH_CURR_POS
+                 18, 0, 2, 2, 22, 0, 23, 1,   %% <elements[0]>
+                 15, 55, 3,                   %% IF_NOT_ERROR
+                 18, 2, 2, 2, 22, 2, 23, 3,   %%   * <elements[1]>
+                 15, 40, 4,                   %%     IF_NOT_ERROR
+                 18, 4, 2, 2, 22, 4, 23, 5,   %%       * <elements[2]>
+                 15, 25, 4,                   %%         IF_NOT_ERROR
+                 25,                          %%           * UPDATE_SAVED_POS
+                 26, 6, 0, 3, 2, 1, 0,        %%             CALL
+                 13, 2, 2,                    %%             IF
+                 6,                           %%               * POP
+                 1,                           %%                 PUSH_UNDEFINED
+                 6,                           %%               * POP
+                 3,                           %%                 PUSH_FAILED
+                 15, 3, 4,                    %%             IF_NOT_ERROR
+                 11, 4,                       %%               * WRAP
+                 9,                           %%                 NIP
+                 8, 4,                        %%               * POP_N
+                 7,                           %%                 POP_CURR_POS
+                 3,                           %%                 PUSH_FAILED
+                 8, 3,                        %%           * POP_N
+                 7,                           %%             POP_CURR_POS
+                 3,                           %%             PUSH_FAILED
+                 8, 2,                        %%       * POP_N
+                 7,                           %%         POP_CURR_POS
+                 3,                           %%         PUSH_FAILED
+                 6,                           %%   * POP
+                 7,                           %%     POP_CURR_POS
+                 3                            %%     PUSH_FAILED
+              >>]
             , [
                 <<"a">>,
                 #entry{type = <<"literal">>, value = <<"a">>, description = <<"\\\"a\\\"">>},
@@ -358,52 +358,52 @@ bytecode_test_() ->
             )
     , run_test( "for semantic_not, without labels"
               , "start = !{ code }"
-              , [
-                  21,            %%  REPORT_CURR_POS
-                  22, 0, 0, 0,   %%  CALL
-                  9, 2, 2,       %%  IF
-                  2,             %%    * POP
-                  28,            %%      PUSH_FAILED
-                  2,             %%    * POP
-                  26             %%      PUSH_UNDEFINED
-                ]
+              , [<<
+                   25,            %% UPDATE_SAVED_POS
+                   26, 0, 0, 0,   %% CALL
+                   13, 2, 2,      %% IF
+                   6,             %%   * POP
+                   3,             %%     PUSH_FAILED
+                   6,             %%   * POP
+                   1              %%     PUSH_UNDEFINED
+                >>]
               , [
                   {function, [], <<" code ">>}
                 ]
               )
     , run_test( "for semantic_not, with labels"
               , "start = a:\"a\" b:\"b\" c:\"c\" !{ code }"
-              , [
-                    1,                           %%  PUSH_CURR_POS
-                    14, 0, 2, 2, 18, 0, 19, 1,   %%  <elements[0]>
-                    11, 55, 3,                   %%  IF_NOT_ERROR
-                    14, 2, 2, 2, 18, 2, 19, 3,   %%    * <elements[1]>
-                    11, 40, 4,                   %%      IF_NOT_ERROR
-                    14, 4, 2, 2, 18, 4, 19, 5,   %%        * <elements[2]>
-                    11, 25, 4,                   %%          IF_NOT_ERROR
-                    21,                          %%            * REPORT_CURR_POS
-                    22, 6, 0, 3, 2, 1, 0,        %%              CALL
-                    9, 2, 2,                     %%              IF
-                    2,                           %%                * POP
-                    28,                          %%                  PUSH_FAILED
-                    2,                           %%                * POP
-                    26,                          %%                  PUSH_UNDEFINED
-                    11, 3, 4,                    %%              IF_NOT_ERROR
-                    7, 4,                        %%                * WRAP
-                    5,                           %%                  NIP
-                    4, 4,                        %%                * POP_N
-                    3,                           %%                  POP_CURR_POS
-                    28,                          %%                  PUSH_FAILED
-                    4, 3,                        %%            * POP_N
-                    3,                           %%              POP_CURR_POS
-                    28,                          %%              PUSH_FAILED
-                    4, 2,                        %%        * POP_N
-                    3,                           %%          POP_CURR_POS
-                    28,                          %%          PUSH_FAILED
-                    2,                           %%    * POP
-                    3,                           %%      POP_CURR_POS
-                    28                           %%      PUSH_FAILED
-                ]
+              , [<<
+                   5,                           %% PUSH_CURR_POS
+                   18, 0, 2, 2, 22, 0, 23, 1,   %% <elements[0]>
+                   15, 55, 3,                   %% IF_NOT_ERROR
+                   18, 2, 2, 2, 22, 2, 23, 3,   %%   * <elements[1]>
+                   15, 40, 4,                   %%     IF_NOT_ERROR
+                   18, 4, 2, 2, 22, 4, 23, 5,   %%       * <elements[2]>
+                   15, 25, 4,                   %%         IF_NOT_ERROR
+                   25,                          %%           * UPDATE_SAVED_POS
+                   26, 6, 0, 3, 2, 1, 0,        %%             CALL
+                   13, 2, 2,                    %%             IF
+                   6,                           %%               * POP
+                   3,                           %%                 PUSH_FAILED
+                   6,                           %%               * POP
+                   1,                           %%                 PUSH_UNDEFINED
+                   15, 3, 4,                    %%             IF_NOT_ERROR
+                   11, 4,                       %%               * WRAP
+                   9,                           %%                 NIP
+                   8, 4,                        %%               * POP_N
+                   7,                           %%                 POP_CURR_POS
+                   3,                           %%                 PUSH_FAILED
+                   8, 3,                        %%           * POP_N
+                   7,                           %%             POP_CURR_POS
+                   3,                           %%             PUSH_FAILED
+                   8, 2,                        %%       * POP_N
+                   7,                           %%         POP_CURR_POS
+                   3,                           %%         PUSH_FAILED
+                   6,                           %%   * POP
+                   7,                           %%     POP_CURR_POS
+                   3                            %%     PUSH_FAILED
+                >>]
               , [
                   <<"a">>,
                   #entry{ type = <<"literal">>
@@ -424,29 +424,29 @@ bytecode_test_() ->
               , "start = other\n"
                 "other = \"other\""
               , [
-                  23, 1,       %% RULE
-                  14, 0, 2, 2, %% MATCH_STRING
-                  18, 0,       %%   * ACCEPT_STRING
-                  19, 1        %%   * FAIL
+                  <<27, 1>>,       %% RULE
+                  <<18, 0, 2, 2, %% MATCH_STRING
+                  22, 0,       %%   * ACCEPT_STRING
+                  23, 1>>        %%   * FAIL
                 ]
               , []
               )
     , run_test( "for literal, empty"
               , "start = \"\""
-              , [
+              , [<<
                  0, 0           %% PUSH
-                ]
+                >>]
               , [
                   <<>>
                 ]
               )
     , run_test( "for literal, non-empty case-sensitive"
               , "start = \"a\""
-              , [
-                    14, 0, 2, 2,   %%  MATCH_STRING
-                    18, 0,         %%    * ACCEPT_STRING
-                    19, 1          %%    * FAIL
-                ]
+              , [<<
+                   18, 0, 2, 2,   %% MATCH_STRING
+                   22, 0,         %%   * ACCEPT_STRING
+                   23, 1          %%   * FAIL
+                >>]
               , [
                   <<"a">>,
                   #entry{ type = <<"literal">>
@@ -457,11 +457,11 @@ bytecode_test_() ->
               )
     , run_test( "for literal, non-empty case-insensitive"
               , "start = \"A\"i"
-              , [
-                    15, 0, 2, 2,   %%  MATCH_STRING_IC
-                    17, 1,         %%    * ACCEPT_N
-                    19, 1          %%    * FAIL
-                ]
+              , [<<
+                   19, 0, 2, 2,   %% MATCH_STRING_IC
+                   21, 1,         %%   * ACCEPT_N
+                   23, 1          %%   * FAIL
+                >>]
               , [
                     <<"A">>,
                     #entry{ type = <<"literal">>
@@ -472,11 +472,11 @@ bytecode_test_() ->
               )
     , run_test( "for class"
               , "start = [a]"
-              , [
-                  16, 0, 2, 2,   %%  MATCH_REGEXP
-                  17, 1,         %%    * ACCEPT_N
-                  19, 1          %%    * FAIL
-                ]
+              , [<<
+                   20, 0, 2, 2,   %% MATCH_REGEXP
+                   21, 1,         %%   * ACCEPT_N
+                   23, 1          %%   * FAIL
+                >>]
               , []
               )
     , run_test( "for class, non-empty non-inverted case-sensitive"
@@ -545,11 +545,11 @@ bytecode_test_() ->
               )
     , run_test( "for any"
               , "start = ."
-              , [
-                13, 2, 2,   %%  MATCH_ANY
-                17, 1,      %%    * ACCEPT_N
-                19, 0       %%    * FAIL
-            ]
+              , [<<
+                17, 2, 2,   %%  MATCH_ANY
+                21, 1,      %%    * ACCEPT_N
+                23, 0       %%    * FAIL
+                >>]
               , [
                  #entry{ type = <<"any">>
                        , description = <<"any character">> }

@@ -207,7 +207,7 @@ generate_template(_Options) ->
   file:read_file(filename:join([code:priv_dir(pegjs), "pegjs2_functional.template"])).
 
 generate_file_parse(#entry{rules = [H|_]}, Options) ->
-  Root = case proplists:get_value(starte_rule, Options) of
+  Root = case proplists:get_value(start_rule, Options) of
            undefined -> H#entry.name;
            Name      -> Name
          end,
@@ -264,18 +264,36 @@ generate_combinators(Required, Existing) ->
   {ok, lists:usort(Cs)}.
 
 generate_functions(Funs) ->
-  R = lists:foldl(fun({_, #function{ arg   = Arg
-                                   , code  = Code
-                                   , index = Index}}, Acc) ->
-                    FName = generate_function_name(Index),
-                    F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
-                        , FName/binary, "(", Arg/binary, ") -> \n"
-                        , Code/binary
-                        , ".\n\n"
-                        >>,
-                    <<Acc/binary, F/binary>>
-                end, <<>>, dict:to_list(Funs)),
+  R = lists:foldl(fun generate_function_body/2, <<>>, dict:to_list(Funs)),
   {ok, R}.
+
+generate_function_body({Index, B}, Acc) when is_binary(B) ->
+  FName = generate_function_name(Index),
+  Code = case B of
+           <<>> -> <<"Node">>;
+           _ -> B
+         end,
+  F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
+      , FName/binary, "(Node) -> \n"
+      , Code/binary
+      , ".\n\n"
+      >>,
+
+  <<Acc/binary, "\n\n", F/binary>>;
+generate_function_body({_, #function{ arg   = Arg
+                                    , code  = Code
+                                    , index = Index}}, Acc) ->
+  F = case Code of
+        <<>> -> <<>>;
+        _ ->
+          FName = generate_function_name(Index),
+          <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
+          , FName/binary, "(", Arg/binary, ") -> \n"
+          , Code/binary
+          , ".\n\n"
+          >>
+      end,
+  <<Acc/binary, F/binary>>.
 
 generate_function_name({{line, Line}, {column, Column}}) ->
  <<"pegjs_custom_fun_"

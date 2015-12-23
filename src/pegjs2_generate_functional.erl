@@ -264,35 +264,17 @@ generate_combinators(Required, Existing) ->
   {ok, lists:usort(Cs)}.
 
 generate_functions(Funs) ->
-  R = lists:foldl(fun generate_function_body/2, <<>>, dict:to_list(Funs)),
-  {ok, R}.
+  {ok, lists:foldl(fun generate_function_body/2, <<>>, dict:to_list(Funs))}.
 
-generate_function_body({Index, B}, Acc) when is_binary(B) ->
-  FName = generate_function_name(Index),
-  Code = case B of
-           <<>> -> <<"Node">>;
-           _ -> B
-         end,
-  F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
-      , FName/binary, "(Node) -> \n"
-      , Code/binary
-      , ".\n\n"
-      >>,
-
-  <<Acc/binary, "\n\n", F/binary>>;
 generate_function_body({_, #function{ arg   = Arg
                                     , code  = Code
                                     , index = Index}}, Acc) ->
-  F = case Code of
-        <<>> -> <<>>;
-        _ ->
-          FName = generate_function_name(Index),
-          <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
-          , FName/binary, "(", Arg/binary, ") -> \n"
-          , Code/binary
-          , ".\n\n"
-          >>
-      end,
+  FName = generate_function_name(Index),
+  F = <<"-spec ", FName/binary, "(#pegjs_node{}) -> #pegjs_node{} | {error, term()}.\n"
+      , FName/binary, "(", Arg/binary, ") -> \n"
+      , Code/binary
+      , ".\n\n"
+      >>,
   <<Acc/binary, F/binary>>.
 
 generate_function_name({{line, Line}, {column, Column}}) ->

@@ -203,10 +203,13 @@ is_combinator(Type) ->
 
 
 -spec perform_code_analysis(#analysis{}) -> #analysis{} | {error, term()}.
-perform_code_analysis(#analysis{code = Codes0} = Analysis) ->
-  case perform_code_analysis(dict:to_list(Codes0), []) of
-    {error, _} = E -> E;
-    Codes          -> Analysis#analysis{code = dict:from_list(Codes)}
+perform_code_analysis(#analysis{code = Codes0, options = Options} = Analysis) ->
+  case lists:keyfind(ignore_invalid_code, 1, Options) of
+    {_, true} -> Analysis;
+    _ -> case perform_code_analysis(dict:to_list(Codes0), []) of
+           {error, _} = E -> E;
+           Codes -> Analysis#analysis{code = dict:from_list(Codes)}
+         end
   end.
 
 -spec perform_code_analysis(list(), list()) -> #analysis{} | {error, term()}.

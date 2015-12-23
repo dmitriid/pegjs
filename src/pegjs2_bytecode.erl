@@ -255,15 +255,6 @@ generate(#entry{ type         = <<"choice">>
   build_alternatives(Alternatives, Context);
 generate(#entry{ type        = <<"action">>
                , expression  = Expression0
-               , code        = <<>>
-               }
-        , Context) ->
-  ets:update_counter(?CONTEXT, ?COUNTER, 1),
-  Res = generate(Expression0, Context),
-  ets:update_counter(?CONTEXT, ?COUNTER, -1),
-  Res;
-generate(#entry{ type        = <<"action">>
-               , expression  = Expression0
                , code        = Code
                } = Entry
         , #context{sp = Sp, env = Env}) ->
@@ -284,7 +275,7 @@ generate(#entry{ type        = <<"action">>
                                               true -> Sp + 1;
                                               false -> Sp
                                             end
-                                     , env = Env
+                                     , env = [{dont_descend, true} | Env]
                                      , action = Entry
                                      }),
   FunctionIndex = add_function_const(Code),
@@ -308,12 +299,20 @@ generate(#entry{ type        = <<"action">>
 generate(#entry{ type     = <<"sequence">>
                , elements = Elements
                } = Entry
-        , #context{sp = Sp} = Context) ->
+        , #context{sp = Sp, env = Env} = Context) ->
 %%  io:format("ELEMENTS ~p~n~n", [Elements]),
 %%  io:format("CODE ~p~n~n", [lists:flatten(build_elements_code(Entry, Elements, Context#context{sp = Sp + 1}))]),
-  [ ?PUSH_CURR_POS
-  , build_elements_code(Entry, Elements, Context#context{sp = Sp + 1})
-  ];
+  DontDescend = case lists:keyfind(dont_descend, 1, Env) of {_, true} -> true; _ -> false end,
+  if DontDescend -> true;
+     true -> ets:update_counter(?CONTEXT, ?COUNTER, 1)
+  end,
+  Res = [ ?PUSH_CURR_POS
+        , build_elements_code(Entry, Elements, Context#context{sp = Sp + 1})
+        ],
+  if DontDescend -> true;
+     true -> ets:update_counter(?CONTEXT, ?COUNTER, -1)
+  end,
+  Res;
 generate(#entry{ type       = <<"labeled">>
                , label      = Label
                , expression = Expression

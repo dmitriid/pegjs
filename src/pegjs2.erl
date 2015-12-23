@@ -24,7 +24,7 @@
 %%_* Types =====================================================================
 -type option()  :: {output, Dir::string() | binary()} %% where to put the generated file
                  | {module, string() | binary()}
-                 | pegjs_analyze:option().
+                 | pegjs2_analyze:option().
 -type options() :: [option()].
 
 -export_type([option/0, options/0]).
@@ -61,8 +61,9 @@ compile(Options) ->
                     , fun pegjs2_analyze:report_left_recursion/1
                     , fun pegjs2_analyze:remove_proxy_rules/1
                     , fun pegjs2_analyze:perform_code_analysis/1
-%%                     , fun pegjs2_bytecode:generate/1
+                     , fun pegjs2_bytecode:generate/1
+                     , fun pegjs2_generate_bytecode:generate/1
 %%                     , fun pegjs2_generate_functional:generate/1
-                    , fun pegjs2_generate_eqc_model:generate/1
+%%                    , fun pegjs2_generate_eqc_model:generate/1
                     ]
                    , Options).

@@ -194,11 +194,7 @@ ActionExpression
       Code = value(<<"code">>, Node),
       case Code of
         [] ->
-          #entry{ type       = <<"action">>
-                , expression = entries(Expression)
-                , code       = <<>>
-                , index      = index(Node)
-                };
+          entries(Expression);
         [_, C]  ->
           #entry{ type       = <<"action">>
                 , expression = entries(Expression)
